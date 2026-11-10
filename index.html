@@ -1,562 +1,908 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>边角边（SAS）三角形全等交互式演示</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#4f46e5" />
+<title>公考备考 · 刷题与学习管理</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root {
-    --blue: #2563EB;
-    --blue-light: #DBEAFE;
-    --orange: #EA580C;
-    --orange-light: #FED7AA;
-    --green: #16A34A;
-    --red: #DC2626;
-    --bg: #F8FAFC;
-    --text: #1E293B;
-    --text-light: #64748B;
-    --border: #E2E8F0;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    min-height: 100vh;
-  }
-  .container { max-width: 960px; margin: 0 auto; padding: 20px 16px 40px; }
+:root{
+  --bg:#f4f5fa; --card:#ffffff; --ink:#191d2b; --ink2:#5a6377; --ink3:#8d95a8;
+  --line:#e9ebf2; --brand:#4f46e5; --brand-2:#6d5ef0; --brand-soft:#eef0ff;
+  --ok:#0ea05a; --ok-soft:#e6f7ee; --err:#e0454b; --err-soft:#fdeced; --warn:#e8930c;
+  --radius:16px; --shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 28px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+button{font-family:inherit}
+.header{position:sticky;top:0;z-index:30;background:rgba(244,245,250,.86);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.header-inner{max-width:900px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+.brand{font-weight:800;font-size:16.5px;letter-spacing:-.3px;white-space:nowrap;display:flex;align-items:center;gap:7px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,#4f46e5,#8b5cf6)}
+.nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin-left:auto}
+.nav::-webkit-scrollbar{display:none}
+.nav a{padding:7px 12px;border-radius:999px;font-size:14px;color:var(--ink2);white-space:nowrap;transition:.15s}
+.nav a:hover{background:#e9eaf4;color:var(--ink)}
+.nav a.active{background:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(79,70,229,.28)}
+.wrap{max-width:900px;margin:0 auto;padding:18px 16px 70px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;border:1px solid rgba(233,235,242,.7)}
+.card+.card{margin-top:14px}
+h1,h2,h3{margin:0;letter-spacing:-.3px;line-height:1.35}
+h1{font-size:22px}h2{font-size:16.5px}h3{font-size:14.5px}
+.muted{color:var(--ink2)}
+.small{font-size:13px}
+.tiny{font-size:12px;color:var(--ink3)}
+.row{display:flex;align-items:center;gap:10px}
+.between{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.stack{display:flex;flex-direction:column;gap:12px}
 
-  /* 标题区 */
-  header { text-align: center; margin-bottom: 20px; }
-  header h1 {
-    font-size: 26px; font-weight: 700; letter-spacing: 1px;
-    color: var(--text); margin-bottom: 6px;
-  }
-  header .subtitle { font-size: 14px; color: var(--text-light); }
+.grid-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:640px){.grid-stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 14px}
+.stat .k{font-size:12px;color:var(--ink3);letter-spacing:.2px}
+.stat .v{font-size:24px;font-weight:800;letter-spacing:-.8px;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat .v span{font-size:12px;font-weight:600;color:var(--ink3);margin-left:3px}
 
-  /* 模式切换 */
-  .mode-tabs {
-    display: flex; gap: 0; margin-bottom: 16px; background: #fff;
-    border-radius: 10px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
-    border: 1px solid var(--border);
-  }
-  .mode-tab {
-    flex: 1; padding: 10px 8px; text-align: center; border-radius: 7px;
-    cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-light);
-    transition: all .2s; border: none; background: transparent;
-  }
-  .mode-tab.active {
-    background: var(--blue); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,.3);
-  }
-  .mode-tab:not(.active):hover { background: var(--bg); color: var(--text); }
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink);
+  padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{background:#f7f8fc}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border-color:transparent;box-shadow:0 6px 16px rgba(79,70,229,.28)}
+.btn-primary:hover{filter:brightness(1.05);background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+.btn-ok{background:var(--ok-soft);color:var(--ok);border-color:#cdeedd}
+.btn-err{background:var(--err-soft);color:var(--err);border-color:#f6d4d6}
+.btn-sm{padding:7px 12px;font-size:13px;border-radius:10px}
+.btn-block{width:100%}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#f2f3f9;color:var(--ink2);font-size:12px;font-weight:600}
+.chip.brand{background:var(--brand-soft);color:var(--brand)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.err{background:var(--err-soft);color:var(--err)}
 
-  /* 主画布区 */
-  .canvas-wrap {
-    background: #fff; border-radius: 12px; border: 1px solid var(--border);
-    box-shadow: 0 1px 3px rgba(0,0,0,.04); overflow: hidden; margin-bottom: 16px;
-  }
-  canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: default; }
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{border:1px solid var(--line);background:#fff;color:var(--ink2);padding:6px 12px;border-radius:999px;font-size:13px;cursor:pointer;transition:.15s}
+.seg button.on{background:var(--brand);color:#fff;border-color:transparent}
 
-  /* 控制面板 */
-  .controls {
-    background: #fff; border-radius: 12px; border: 1px solid var(--border);
-    padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  }
-  .controls h3 { font-size: 15px; margin-bottom: 14px; color: var(--text); font-weight: 600; }
-  .slider-row { margin-bottom: 14px; }
-  .slider-row label {
-    display: flex; justify-content: space-between; font-size: 13px;
-    color: var(--text-light); margin-bottom: 6px;
-  }
-  .slider-row label .val { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-  .slider-row.blue label .val { color: var(--blue); }
-  .slider-row.orange label .val { color: var(--orange); }
-  .slider-row.angle label .val { color: #7C3AED; }
-  input[type="range"] {
-    width: 100%; height: 6px; border-radius: 3px; outline: none;
-    -webkit-appearance: none; background: var(--border);
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
-    background: #fff; border: 2px solid var(--blue); cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0,0,0,.15);
-  }
-  input[type="range"].orange::-webkit-slider-thumb { border-color: var(--orange); }
-  input[type="range"].angle::-webkit-slider-thumb { border-color: #7C3AED; }
+.hero{background:linear-gradient(135deg,#4f46e5,#7c5cf0 55%,#9a6bf5);color:#fff;border:none}
+.hero h1{font-size:21px}
+.hero .sub{color:rgba(255,255,255,.82);font-size:13.5px;margin-top:4px}
+.hero .row{margin-top:16px;flex-wrap:wrap;gap:8px}
+.hero .btn{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.3);color:#fff;backdrop-filter:blur(6px)}
+.hero .btn:hover{background:rgba(255,255,255,.26)}
+.hero .btn.solid{background:#fff;color:var(--brand);border-color:#fff}
 
-  /* 按钮组 */
-  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
-  .btn {
-    padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;
-    cursor: pointer; border: none; transition: all .15s;
-  }
-  .btn-primary { background: var(--blue); color: #fff; }
-  .btn-primary:hover { background: #1D4ED8; }
-  .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
-  .btn-secondary:hover { background: #EEF2F6; }
-  .btn-danger { background: var(--orange-light); color: var(--orange); }
-  .btn-danger:hover { background: #FDBA74; }
+.quote{border-left:3px solid var(--brand);padding:2px 0 2px 14px;color:var(--ink2);font-size:14px}
+.quote .from{display:block;margin-top:6px;font-size:12px;color:var(--ink3)}
 
-  /* 数据对比面板 */
-  .data-panel {
-    background: #fff; border-radius: 12px; border: 1px solid var(--border);
-    padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  }
-  .data-panel h3 { font-size: 15px; margin-bottom: 10px; font-weight: 600; }
-  .data-grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
-    font-size: 13px;
-  }
-  .data-cell { padding: 8px 10px; border-radius: 6px; background: var(--bg); }
-  .data-cell .k { color: var(--text-light); font-size: 12px; }
-  .data-cell .v { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .data-cell.blue .v { color: var(--blue); }
-  .data-cell.orange .v { color: var(--orange); }
+.q-card{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff}
+.q-title{font-size:15.5px;line-height:1.7;font-weight:600}
+.opt{display:flex;gap:11px;align-items:flex-start;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:11px 13px;cursor:pointer;transition:.13s;text-align:left;width:100%;font-size:14.5px;color:var(--ink)}
+.opt:hover{border-color:#c9cdf0;background:#fbfbff}
+.opt .ltr{flex:none;width:22px;height:22px;border-radius:50%;background:#f2f3f9;color:var(--ink2);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.opt.sel{border-color:var(--brand);background:var(--brand-soft)}
+.opt.sel .ltr{background:var(--brand);color:#fff}
+.opt.correct{border-color:#8fdcb4;background:var(--ok-soft)}
+.opt.correct .ltr{background:var(--ok);color:#fff}
+.opt.wrong{border-color:#f3b9bc;background:var(--err-soft)}
+.opt.wrong .ltr{background:var(--err);color:#fff}
+.opt[disabled]{cursor:default}
 
-  /* 结论提示 */
-  .verdict {
-    padding: 14px 16px; border-radius: 10px; font-size: 14px;
-    margin-bottom: 16px; line-height: 1.7;
-  }
-  .verdict.ok { background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
-  .verdict.no { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
-  .verdict.info { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
+.explain{margin-top:14px;padding:13px 14px;border-radius:12px;background:#f8f9fd;border:1px solid var(--line);font-size:14px;color:var(--ink2)}
+.explain b{color:var(--ink)}
+.progress{height:6px;border-radius:999px;background:#e9ebf2;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#4f46e5,#8b5cf6);border-radius:999px;transition:width .3s}
 
-  /* 教学说明 */
-  .explain {
-    background: #fff; border-radius: 12px; border: 1px solid var(--border);
-    padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  }
-  .explain h3 { font-size: 15px; margin-bottom: 10px; font-weight: 600; }
-  .explain p { font-size: 14px; color: var(--text); margin-bottom: 8px; }
-  .explain .formula {
-    display: inline-block; padding: 2px 8px; background: var(--bg);
-    border-radius: 4px; font-family: "Times New Roman", serif; font-style: italic;
-    font-size: 15px;
-  }
-  .explain ul { padding-left: 20px; margin-top: 6px; }
-  .explain li { font-size: 14px; margin-bottom: 4px; color: var(--text); }
+.sel-row{display:grid;grid-template-columns:76px 1fr;gap:10px;align-items:center}
+.sel-row label{font-size:13.5px;color:var(--ink2)}
+select,input[type=text],input[type=date],textarea{
+  width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;font-size:14px;color:var(--ink);font-family:inherit;outline:none}
+select:focus,input:focus,textarea:focus{border-color:#b9bdf0;box-shadow:0 0 0 3px rgba(79,70,229,.1)}
 
-  @media (max-width: 600px) {
-    header h1 { font-size: 20px; }
-    .data-grid { grid-template-columns: 1fr; }
-    .btn { flex: 1; padding: 10px 12px; font-size: 13px; }
-  }
+.list-item{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px dashed var(--line)}
+.list-item:last-child{border-bottom:none;padding-bottom:0}
+.list-item:first-child{padding-top:0}
+
+.chart{display:flex;align-items:flex-end;gap:10px;height:130px;padding-top:8px}
+.chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.chart .bar{width:100%;max-width:34px;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,#7c6cf3,#4f46e5);min-height:4px;transition:.4s}
+.chart .bar.zero{background:#e9ebf2}
+.chart .lb{font-size:11px;color:var(--ink3)}
+.chart .val{font-size:11px;color:var(--ink2);font-weight:600}
+
+.timer{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0 2px}
+.timer .ring{position:relative;width:210px;height:210px}
+.timer .ring svg{transform:rotate(-90deg)}
+.timer .time{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.timer .time b{font-size:40px;font-weight:800;letter-spacing:-1.5px;font-variant-numeric:tabular-nums}
+.timer .time span{font-size:12px;color:var(--ink3)}
+
+.empty{text-align:center;padding:34px 16px;color:var(--ink3)}
+.empty .ico{font-size:30px;margin-bottom:8px;opacity:.7}
+
+#toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:#1b2030;color:#fff;padding:10px 18px;border-radius:999px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;z-index:90;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.banner{background:#fff8ea;border:1px solid #f6e0b0;color:#8a5a09;border-radius:14px;padding:13px 15px;font-size:13.5px;line-height:1.6}
+.banner code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px;font-size:12px}
+.spin{width:18px;height:18px;border:2px solid #dfe2ee;border-top-color:var(--brand);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.center{display:flex;align-items:center;justify-content:center;gap:8px;padding:40px 0;color:var(--ink3);font-size:13.5px}
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <h1>边角边（S A S）三角形全等判定</h1>
-    <p class="subtitle">拖动滑块或顶点，观察两边及夹角如何决定三角形形状</p>
-  </header>
-
-  <div class="mode-tabs">
-    <button class="mode-tab active" data-mode="sas">SAS 验证模式</button>
-    <button class="mode-tab" data-mode="ssa">SSA 反例模式</button>
+<header class="header">
+  <div class="header-inner">
+    <div class="brand"><span class="dot"></span>公考备考</div>
+    <nav class="nav" id="nav">
+      <a href="#/home" data-r="home">首页</a>
+      <a href="#/practice" data-r="practice">刷题</a>
+      <a href="#/wrong" data-r="wrong">错题本</a>
+      <a href="#/records" data-r="records">记录</a>
+      <a href="#/pomodoro" data-r="pomodoro">番茄钟</a>
+      <a href="#/todos" data-r="todos">待办</a>
+    </nav>
   </div>
+</header>
 
-  <div class="canvas-wrap">
-    <canvas id="cv" width="900" height="480"></canvas>
-  </div>
-
-  <div class="controls">
-    <h3>参数调节</h3>
-    <div class="slider-row blue">
-      <label>边 AB（蓝色）<span class="val" id="abVal">160 px</span></label>
-      <input type="range" id="abSlider" min="80" max="220" value="160">
-    </div>
-    <div class="slider-row orange">
-      <label>边 AC（橙色）<span class="val" id="acVal">120 px</span></label>
-      <input type="range" id="acSlider" min="60" max="200" value="120">
-    </div>
-    <div class="slider-row angle">
-      <label>夹角 ∠A（紫色）<span class="val" id="angVal">60°</span></label>
-      <input type="range" id="angSlider" min="15" max="150" value="60">
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="mergeBtn">叠合演示</button>
-      <button class="btn btn-secondary" id="resetBtn">重置</button>
-      <button class="btn btn-secondary" id="rotateBtn">旋转视角</button>
-    </div>
-  </div>
-
-  <div class="data-panel">
-    <h3>数据对比</h3>
-    <div class="data-grid">
-      <div class="data-cell blue">
-        <div class="k">△ABC 边 AB</div>
-        <div class="v" id="dAB">160 px</div>
-      </div>
-      <div class="data-cell orange">
-        <div class="k">△A'B'C' 边 A'B'</div>
-        <div class="v" id="dA2B2">160 px</div>
-      </div>
-      <div class="data-cell" style="background:var(--orange-light)">
-        <div class="k">是否相等</div>
-        <div class="v" style="color:var(--green)" id="eq1">✓ 相等</div>
-      </div>
-      <div class="data-cell blue">
-        <div class="k">△ABC 边 AC</div>
-        <div class="v" id="dAC">120 px</div>
-      </div>
-      <div class="data-cell orange">
-        <div class="k">△A'B'C' 边 A'C'</div>
-        <div class="v" id="dA2C2">120 px</div>
-      </div>
-      <div class="data-cell" style="background:var(--orange-light)">
-        <div class="k">是否相等</div>
-        <div class="v" style="color:var(--green)" id="eq2">✓ 相等</div>
-      </div>
-      <div class="data-cell blue">
-        <div class="k">∠A（夹角）</div>
-        <div class="v" id="dAng">60°</div>
-      </div>
-      <div class="data-cell orange">
-        <div class="k">∠A'（夹角）</div>
-        <div class="v" id="dAng2">60°</div>
-      </div>
-      <div class="data-cell" style="background:var(--orange-light)">
-        <div class="k">是否相等</div>
-        <div class="v" style="color:var(--green)" id="eq3">✓ 相等</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="verdict ok" id="verdict">
-    <strong>结论：</strong>两边及其夹角对应相等 → △ABC ≅ △A'B'C'（边角边公理）
-  </div>
-
-  <div class="explain">
-    <h3>知识点说明</h3>
-    <p><span class="formula">SAS</span>（Side-Angle-Side）：如果两个三角形有<strong>两边及其夹角</strong>分别对应相等，那么这两个三角形全等。</p>
-    <ul>
-      <li>关键：角必须是两边的<strong>夹角</strong>（即两条边所夹的角）。</li>
-      <li>当 AB、AC、∠A 三个量确定后，三角形的形状和大小就<strong>唯一确定</strong>了。</li>
-      <li>点击「叠合演示」可以看到两个三角形能够完全重合。</li>
-    </ul>
-    <p style="margin-top:10px"><strong>反例警示：</strong>如果相等的角不是夹角（即 <span class="formula">SSA</span>），三角形不一定唯一——切换到「SSA 反例模式」观察。</p>
-  </div>
-</div>
+<main class="wrap" id="view"></main>
+<div id="toast"></div>
 
 <script>
-const cv = document.getElementById('cv');
-const ctx = cv.getContext('2d');
-const W = cv.width, H = cv.height;
-
-// 状态
-const state = {
-  ab: 160,       // 边AB长度（像素）
-  ac: 120,       // 边AC长度（像素）
-  angle: 60,     // 夹角（度）
-  mode: 'sas',   // sas | ssa
-  merging: false,
-  mergeProgress: 0,  // 0=分开, 1=完全重合
-  rotation: 0,       // 旋转视角
-  dragVertex: null,  // 正在拖动的顶点
-  offsetX: 0, offsetY: 0,
+/* ============ 配置：项目地址与 anon key ============ */
+const CFG = {
+  url: 'https://toqswzeuxuamvhcguhec.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcXN3emV1eHVhbXZoY2d1aGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2ODY0MzAsImV4cCI6MjEwNDI2MjQzMH0.loTb6Y-N0S5U6pnuQqbpligywsiz2bu0VuMSyvr9C6g',
+  userId: '11111111-1111-1111-1111-111111111111'
 };
+const SUBJECTS = ['常识判断','言语理解','数量关系','判断推理','资料分析','公共基础知识'];
+const DIFFS = ['easy','mid','hard'];
+const DIFF_LABEL = { easy:'简单', mid:'中等', hard:'困难' };
+const diffLabel = d => DIFF_LABEL[d] || d;
+const tagsText = t => Array.isArray(t) ? t.map(diffLabel).join(' · ') : (t ? diffLabel(t) : '');
 
-// 三角形顶点计算
-function computeTriangles() {
-  const rad = state.angle * Math.PI / 180;
-  const s = state.ab, t = state.ac;
-  const rot = state.rotation * Math.PI / 180;
-
-  // 左三角形基准点
-  const baseAX = 140, baseAY = 330;
-  // 右三角形基准点
-  const baseA2X = 560, baseA2Y = 330;
-
-  // 叠合动画：右三角形向左侧移动
-  const mp = state.mergeProgress;
-  const rx = baseA2X + (baseAX - baseA2X) * mp;
-  const ry = baseA2Y + (baseAY - baseA2Y) * mp;
-
-  // 旋转应用
-  function rotPt(px, py, cx, cy, r) {
-    const dx = px - cx, dy = py - cy;
-    return [cx + dx*Math.cos(r) - dy*Math.sin(r), cy + dx*Math.sin(r) + dy*Math.cos(r)];
-  }
-
-  // 左三角形
-  const A = [baseAX, baseAY];
-  const B = [baseAX + s, baseAY];
-  const C = [baseAX + t * Math.cos(rad), baseAY - t * Math.sin(rad)];
-  let tri1 = [A, B, C];
-  if (state.rotation !== 0) {
-    tri1 = tri1.map(p => rotPt(p[0], p[1], baseAX + s/2, baseAY - t/3, rot));
-  }
-
-  // 右三角形
-  const A2 = [rx, ry];
-  const B2 = [rx + s, ry];
-  let C2;
-  if (state.mode === 'sas') {
-    C2 = [rx + t * Math.cos(rad), ry - t * Math.sin(rad)];
-  } else {
-    // SSA 模式：固定AB和角B，AC边长度固定，但C点有两个解
-    // 角在B点：AB方向是水平的，角B = 固定角度
-    const beta = rad; // 用同一个角度作为B角
-    // 从B点出发，与BA方向夹角beta，长度t的射线
-    // BA方向是向左（180度），射线与BA夹角beta向上
-    const dir = Math.PI - beta; // 从B点出发的方向
-    C2 = [B2[0] + t * Math.cos(dir), B2[1] - t * Math.sin(dir)];
-  }
-  let tri2 = [A2, B2, C2];
-  if (state.rotation !== 0) {
-    const cx2 = rx + s/2, cy2 = ry - t/3;
-    tri2 = tri2.map(p => rotPt(p[0], p[1], cx2, cy2, rot));
-  }
-
-  // SSA模式额外画一个"第二个解"三角形（镜像）
-  let tri2b = null;
-  if (state.mode === 'ssa') {
-    const dir2 = Math.PI + beta; // 向下
-    const C2b = [B2[0] + t * Math.cos(dir2), B2[1] - t * Math.sin(dir2)];
-    tri2b = [A2, B2, C2b];
-    if (state.rotation !== 0) {
-      const cx2 = rx + s/2, cy2 = ry;
-      tri2b = tri2b.map(p => rotPt(p[0], p[1], cx2, cy2, rot));
-    }
-  }
-
-  return { tri1, tri2, tri2b };
+/* ============ 基础工具 ============ */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const dateStr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const todayStr = () => dateStr(new Date());
+const dateOf = s => new Date(s);
+function toast(msg, ms=2200){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), ms);
+}
+function loading(){ return `<div class="center"><span class="spin"></span>加载中…</div>`; }
+function emptyState(icon, title, desc=''){
+  return `<div class="empty"><div class="ico">${icon}</div><div style="font-weight:600;color:var(--ink2)">${esc(title)}</div>${desc?`<div class="tiny" style="margin-top:6px">${esc(desc)}</div>`:''}</div>`;
+}
+function friendlyError(e){
+  const m = String(e && e.message || e);
+  if(/row-level security|42501|permission denied/i.test(m)) return '写入被数据库权限拦住：请在 Supabase SQL Editor 执行 supabase_setup.sql';
+  if(/does not exist|PGRST205/i.test(m)) return '表不存在或名称不匹配';
+  if(/Invalid API key|401/i.test(m)) return 'API Key 无效，请检查 index.html 顶部配置';
+  if(/Failed to fetch|NetworkError/i.test(m)) return '网络请求失败，请检查网络';
+  return m.slice(0,160);
 }
 
-function drawGrid() {
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = '#F1F5F9';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 40) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+/* ============ 数据访问 ============ */
+async function sb(table, query='', opt={}){
+  const { method='GET', body, prefer } = opt;
+  const headers = { apikey: CFG.key, Authorization: 'Bearer ' + CFG.key };
+  if(body !== undefined) headers['Content-Type'] = 'application/json';
+  if(prefer) headers['Prefer'] = prefer;
+  let res;
+  try{
+    res = await fetch(`${CFG.url}/rest/v1/${table}${query}`, {
+      method, headers, body: body === undefined ? undefined : JSON.stringify(body)
+    });
+  }catch(e){ throw new Error('Failed to fetch'); }
+  const txt = await res.text();
+  if(!res.ok){
+    let msg = txt;
+    try{ const j = JSON.parse(txt); msg = j.message || j.hint || txt; }catch(e){}
+    throw new Error(msg);
   }
-  for (let y = 0; y < H; y += 40) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
+  return txt ? JSON.parse(txt) : null;
+}
+const insert = (t, rows) => sb(t, '', { method:'POST', body: rows, prefer:'return=representation' });
+const patch  = (t, q, body) => sb(t, q, { method:'PATCH', body, prefer:'return=representation' });
+const del    = (t, q) => sb(t, q, { method:'DELETE', prefer:'return=minimal' });
+
+let _bankCache = null;
+async function loadBank(force){
+  if(_bankCache && !force) return _bankCache;
+  const rows = await sb('questions', '?select=*&order=id.asc');
+  _bankCache = rows || [];
+  return _bankCache;
 }
 
-function drawTri(tri, fillColor, strokeColor, label, labelColor) {
-  ctx.beginPath();
-  ctx.moveTo(tri[0][0], tri[0][1]);
-  ctx.lineTo(tri[1][0], tri[1][1]);
-  ctx.lineTo(tri[2][0], tri[2][1]);
-  ctx.closePath();
-  ctx.fillStyle = fillColor;
-  ctx.globalAlpha = 0.25;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // 顶点标签
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillStyle = labelColor;
-  const labels = ['A', 'B', 'C'];
-  for (let i = 0; i < 3; i++) {
-    const [px, py] = tri[i];
-    ctx.beginPath();
-    ctx.arc(px, py, 5, 0, Math.PI * 2);
-    ctx.fillStyle = strokeColor;
-    ctx.fill();
-    ctx.fillStyle = labelColor;
-    ctx.fillText(label[i] + (label || ''), px + 8, py - 8);
+/* ============ 题目解析（兼容 options 为 jsonb / 文本） ============ */
+function parseOptions(o){
+  if(o == null) return [];
+  if(Array.isArray(o)) return o.map(x => typeof x === 'string' ? x : (x.text || x.label || x.content || JSON.stringify(x)));
+  if(typeof o === 'object') return Object.values(o).map(x => typeof x === 'string' ? x : JSON.stringify(x));
+  const s = String(o).trim();
+  if(!s) return [];
+  if(s.startsWith('[') || s.startsWith('{')){
+    try{
+      const arr = JSON.parse(s);
+      if(Array.isArray(arr)) return arr.map(x => typeof x === 'string' ? x : (x.text || x.label || x.content || JSON.stringify(x)));
+      return Object.values(arr).map(x => typeof x === 'string' ? x : JSON.stringify(x));
+    }catch(e){}
   }
+  return s.split(/\r?\n|；|;/).map(x => x.replace(/^[A-Da-d][.、．)）]\s*/, '').trim()).filter(Boolean);
 }
-
-function drawAngleArc(tri, color) {
-  // 在A点画夹角弧
-  const A = tri[0], B = tri[1], C = tri[2];
-  const r = 28;
-  const angAB = Math.atan2(B[1] - A[1], B[0] - A[0]);
-  const angAC = Math.atan2(C[1] - A[1], C[0] - A[0]);
-  ctx.beginPath();
-  ctx.arc(A[0], A[1], r, Math.min(angAB, angAC), Math.max(angAB, angAC));
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  // 角度标签
-  const midAng = (angAB + angAC) / 2;
-  ctx.fillStyle = color;
-  ctx.font = 'bold 13px sans-serif';
-  ctx.fillText(state.angle + '°', A[0] + r * Math.cos(midAng) + 4, A[1] + r * Math.sin(midAng) - 4);
+function stripLetter(s){ return String(s).replace(/^[A-Da-d][.、．)）]\s*/, ''); }
+function answerIndex(answer, options){
+  if(answer == null) return -1;
+  const a = String(answer).trim();
+  if(/^[A-Da-d]$/.test(a)) return a.toUpperCase().charCodeAt(0) - 65;
+  const key = stripLetter(a);
+  let i = options.findIndex(o => stripLetter(o) === key);
+  if(i < 0) i = options.findIndex(o => stripLetter(o).includes(key) || key.includes(stripLetter(o)));
+  return i;
 }
+const LETTERS = ['A','B','C','D','E','F'];
 
-function drawAngleArcB(tri, color) {
-  // SSA模式：在B点画角
-  const A = tri[0], B = tri[1], C = tri[2];
-  const r = 28;
-  const angBA = Math.atan2(A[1] - B[1], A[0] - B[0]);
-  const angBC = Math.atan2(C[1] - B[1], C[0] - B[0]);
-  ctx.beginPath();
-  ctx.arc(B[0], B[1], r, Math.min(angBA, angBC), Math.max(angBA, angBC));
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+/* ============ 路由 ============ */
+const routes = { home: renderHome, practice: renderPractice, wrong: renderWrong, records: renderRecords, pomodoro: renderPomodoro, todos: renderTodos };
+function go(r){ location.hash = '#/' + r; }
+function currentRoute(){
+  const h = (location.hash || '').replace(/^#\/?/, '');
+  return routes[h] ? h : 'home';
 }
-
-function render() {
-  drawGrid();
-  const { tri1, tri2, tri2b } = computeTriangles();
-
-  // 标题
-  ctx.font = 'bold 15px sans-serif';
-  ctx.fillStyle = '#64748B';
-  ctx.fillText('△ABC（已知）', tri1[0][0] - 10, 50);
-  ctx.fillText(state.mode === 'sas' ? '△A\'B\'C\'（验证）' : '两个不同三角形', tri2[0][0] - 10, 50);
-
-  drawTri(tri1, '#2563EB', '#2563EB', '', '#1E40AF');
-  if (state.mode === 'sas') {
-    drawTri(tri2, '#EA580C', '#EA580C', "'", '#9A3412');
-  } else {
-    drawTri(tri2, '#EA580C', '#EA580C', "'", '#9A3412');
-    drawTri(tri2b, '#7C3AED', '#7C3AED', "''", '#5B21B6');
-  }
-
-  if (state.mode === 'sas') {
-    drawAngleArc(tri1, '#7C3AED');
-    drawAngleArc(tri2, '#7C3AED');
-  } else {
-    drawAngleArcB(tri1, '#7C3AED');
-    drawAngleArcB(tri2, '#7C3AED');
-    drawAngleArcB(tri2b, '#7C3AED');
-  }
-
-  // 边长标注 AB
-  ctx.font = '13px sans-serif';
-  ctx.fillStyle = '#2563EB';
-  const midAB1 = [(tri1[0][0]+tri1[1][0])/2, (tri1[0][1]+tri1[1][1])/2];
-  ctx.fillText('AB=' + state.ab, midAB1[0] - 20, midAB1[1] + 20);
-
-  if (state.mode === 'sas') {
-    ctx.fillStyle = '#EA580C';
-    const midAB2 = [(tri2[0][0]+tri2[1][0])/2, (tri2[0][1]+tri2[1][1])/2];
-    ctx.fillText("A'B'=" + state.ab, midAB2[0] - 20, midAB2[1] + 20);
-  }
+async function route(){
+  const r = currentRoute();
+  $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.r === r));
+  const view = $('#view');
+  view.innerHTML = loading();
+  try{ await routes[r](); }
+  catch(e){ view.innerHTML = `<div class="card"><div class="banner">加载失败：${esc(friendlyError(e))}</div></div>`; }
 }
+window.addEventListener('hashchange', route);
 
-// 滑块绑定
-const abSlider = document.getElementById('abSlider');
-const acSlider = document.getElementById('acSlider');
-const angSlider = document.getElementById('angSlider');
+/* ============ 首页 ============ */
+async function renderHome(){
+  const view = $('#view');
+  const today = todayStr();
+  const [logs, pomos, checks, quotes] = await Promise.all([
+    sb('study_logs', `?select=*&study_date=eq.${today}`).catch(()=>[]),
+    sb('pomodoro_sessions', '?select=*&order=started_at.desc&limit=120').catch(()=>[]),
+    sb('checkins', '?select=*&order=created_at.desc&limit=120').catch(()=>[]),
+    sb('essay_quotes', '?select=*&limit=30').catch(()=>[])
+  ]);
 
-function updateUI() {
-  state.ab = +abSlider.value;
-  state.ac = +acSlider.value;
-  state.angle = +angSlider.value;
-  document.getElementById('abVal').textContent = state.ab + ' px';
-  document.getElementById('acVal').textContent = state.ac + ' px';
-  document.getElementById('angVal').textContent = state.angle + '°';
-  document.getElementById('dAB').textContent = state.ab + ' px';
-  document.getElementById('dA2B2').textContent = state.ab + ' px';
-  document.getElementById('dAC').textContent = state.ac + ' px';
-  document.getElementById('dA2C2').textContent = state.ac + ' px';
-  document.getElementById('dAng').textContent = state.angle + '°';
-  document.getElementById('dAng2').textContent = state.angle + '°';
-  render();
-}
+  const L = (logs||[]);
+  const todayQ = L.reduce((s,x)=>s+(x.correct_count||0)+(x.error_count||0), 0);
+  const todayC = L.reduce((s,x)=>s+(x.correct_count||0), 0);
+  const todayMin = L.reduce((s,x)=>s+(x.total_minutes||0), 0);
+  const rate = todayQ ? Math.round(todayC / todayQ * 100) : 0;
+  const todayPomo = (pomos||[]).filter(p => p.completed && p.started_at && dateStr(new Date(p.started_at)) === today).length;
 
-abSlider.addEventListener('input', updateUI);
-acSlider.addEventListener('input', updateUI);
-angSlider.addEventListener('input', updateUI);
+  // 连续打卡
+  const days = new Set((checks||[]).map(c => c.created_at ? dateStr(new Date(c.created_at)) : '').filter(Boolean));
+  let streak = 0, d = new Date();
+  if(!days.has(dateStr(d))) d.setDate(d.getDate()-1);
+  while(days.has(dateStr(d))){ streak++; d.setDate(d.getDate()-1); }
+  const checkedToday = days.has(today);
 
-// 叠合动画
-let mergeAnim = null;
-document.getElementById('mergeBtn').addEventListener('click', () => {
-  if (mergeAnim) cancelAnimationFrame(mergeAnim);
-  const start = performance.now();
-  const from = state.mergeProgress;
-  const to = state.mergeProgress > 0.5 ? 0 : 1;
-  function step(now) {
-    const t = Math.min((now - start) / 1200, 1);
-    const e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; // easeInOut
-    state.mergeProgress = from + (to - from) * e;
-    render();
-    if (t < 1) mergeAnim = requestAnimationFrame(step);
-    else {
-      state.mergeProgress = to;
-      render();
-      updateVerdict();
-    }
-  }
-  mergeAnim = requestAnimationFrame(step);
-});
+  let quote = null;
+  if(quotes && quotes.length) quote = quotes[Math.floor(Math.random()*quotes.length)];
 
-function updateVerdict() {
-  const v = document.getElementById('verdict');
-  if (state.mode === 'sas') {
-    v.className = 'verdict ok';
-    v.innerHTML = '<strong>结论：</strong>两边及其夹角对应相等 → △ABC ≅ △A\'B\'C\'（边角边公理 SAS）。三个条件确定后，三角形形状大小唯一，可完全重合。';
-  } else {
-    v.className = 'verdict no';
-    v.innerHTML = '<strong>反例：</strong>两边及其中一边的对角（SSA）不能保证三角形唯一！图中橙色和紫色是满足相同条件的<strong>两个不同</strong>三角形，因此 SSA 不能判定全等。';
-  }
-}
+  const hour = new Date().getHours();
+  const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
 
-document.getElementById('resetBtn').addEventListener('click', () => {
-  abSlider.value = 160; acSlider.value = 120; angSlider.value = 60;
-  state.rotation = 0; state.mergeProgress = 0;
-  updateUI(); updateVerdict();
-});
+  view.innerHTML = `
+    <div class="card hero">
+      <h1>${greet}，今天也要加油 💪</h1>
+      <div class="sub">${today} · 连续打卡 <b>${streak}</b> 天${checkedToday?' · 今日已打卡 ✅':' · 今日还没打卡'}</div>
+      <div class="row">
+        <button class="btn solid" id="btn-checkin">${checkedToday?'今日已打卡':'立即打卡'}</button>
+        <button class="btn" data-go="practice">开始刷题 →</button>
+      </div>
+    </div>
 
-document.getElementById('rotateBtn').addEventListener('click', () => {
-  state.rotation = (state.rotation + 30) % 360;
-  render();
-});
+    <div class="grid-stats" style="margin-top:14px">
+      <div class="stat"><div class="k">今日刷题</div><div class="v">${todayQ}<span>题</span></div></div>
+      <div class="stat"><div class="k">今日正确率</div><div class="v">${todayQ?rate:0}<span>%</span></div></div>
+      <div class="stat"><div class="k">今日番茄</div><div class="v">${todayPomo}<span>个</span></div></div>
+      <div class="stat"><div class="k">今日学习</div><div class="v">${todayMin}<span>分钟</span></div></div>
+    </div>
 
-// 模式切换
-document.querySelectorAll('.mode-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    state.mode = tab.dataset.mode;
-    state.mergeProgress = 0;
-    // SSA模式下角度标签改
-    document.querySelector('.slider-row.angle label').innerHTML =
-      state.mode === 'sas' ? '夹角 ∠A（紫色）<span class="val" id="angVal">' + state.angle + '°</span>'
-                           : 'B 角（非夹角）<span class="val" id="angVal">' + state.angle + '°</span>';
-    updateUI(); updateVerdict();
+    <div class="card">
+      <div class="between"><h2>快捷入口</h2><span class="tiny">坚持就是胜利</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px">
+        ${[['practice','📝','刷题'],['wrong','📕','错题本'],['pomodoro','⏱️','番茄钟'],['todos','✅','待办']].map(([r,i,t])=>`
+          <button class="btn" data-go="${r}" style="flex-direction:column;gap:6px;height:76px;font-size:13px"><span style="font-size:20px">${i}</span>${t}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:10px">每日一句</h2>
+      ${quote ? `<div class="quote">${esc(quote.content)}<span class="from">—— ${esc(quote.source||quote.category||'')}</span></div>`
+              : `<div class="tiny">还没有名言素材，执行 supabase_setup.sql 后会自动填充。</div>`}
+    </div>
+  `;
+
+  $('#btn-checkin')?.addEventListener('click', async (e)=>{
+    if(checkedToday) return toast('今天已经打过卡啦');
+    e.target.disabled = true;
+    try{
+      await insert('checkins', { user_id: CFG.userId, notes: '每日打卡', check_date: todayStr() });
+      toast('打卡成功，继续保持！');
+      renderHome();
+    }catch(err){ toast(friendlyError(err), 3200); e.target.disabled = false; }
   });
-});
+  bindGo(view);
+}
 
-// 画布拖动（微调角度）
-cv.addEventListener('pointerdown', (e) => {
-  const rect = cv.getBoundingClientRect();
-  const sx = cv.width / rect.width, sy = cv.height / rect.height;
-  const mx = (e.clientX - rect.left) * sx;
-  const my = (e.clientY - rect.top) * sy;
-  const { tri1 } = computeTriangles();
-  // 检查是否点到了C点
-  const C = tri1[2];
-  if (Math.hypot(mx - C[0], my - C[1]) < 20) {
-    state.dragVertex = 'C';
-    cv.setPointerCapture(e.pointerId);
+function bindGo(root){
+  $$('[data-go]', root).forEach(b => b.addEventListener('click', ()=>go(b.dataset.go)));
+}
+
+/* ============ 刷题 ============ */
+const quiz = { list:[], idx:0, answers:[], subject:'', diff:'', answered:false, startTs:0, results:[] };
+
+async function renderPractice(){
+  const view = $('#view');
+  quiz.list = []; quiz.idx = 0; quiz.answers = []; quiz.results = [];
+
+  const bank = await loadBank().catch(()=>[]);
+  if(!bank.length){
+    view.innerHTML = `<div class="card"><div class="banner">
+      <b>题库还是空的</b><br>
+      打开 Supabase → SQL Editor，执行项目里的 <code>supabase_setup.sql</code>，会自动导入示例题库和名言素材，并放开读写权限。
+    </div></div>`;
+    return;
   }
-});
-cv.addEventListener('pointermove', (e) => {
-  if (state.dragVertex !== 'C') return;
-  const rect = cv.getBoundingClientRect();
-  const sx = cv.width / rect.width, sy = cv.height / rect.height;
-  const mx = (e.clientX - rect.left) * sx;
-  const my = (e.clientY - rect.top) * sy;
-  const { tri1 } = computeTriangles();
-  const A = tri1[0];
-  const dx = mx - A[0], dy = -(my - A[1]);
-  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
-  const len = Math.hypot(dx, dy);
-  state.angle = Math.max(15, Math.min(150, ang));
-  state.ac = Math.max(60, Math.min(200, len));
-  angSlider.value = state.angle;
-  acSlider.value = state.ac;
-  updateUI();
-});
-cv.addEventListener('pointerup', () => { state.dragVertex = null; });
 
-updateUI();
-updateVerdict();
+  const bySub = {};
+  bank.forEach(q => { bySub[q.subject||'未分类'] = (bySub[q.subject||'未分类']||0)+1; });
+
+  view.innerHTML = `
+    <div class="card">
+      <h1>开始刷题</h1>
+      <div class="sub muted small" style="margin-top:4px">题库共 ${bank.length} 题</div>
+      <div class="stack" style="margin-top:18px">
+        <div class="sel-row"><label>科目</label>
+          <select id="f-subject">
+            <option value="">全部科目</option>
+            ${Object.entries(bySub).map(([s,n])=>`<option value="${esc(s)}">${esc(s)}（${n}题）</option>`).join('')}
+          </select>
+        </div>
+        <div class="sel-row"><label>难度</label>
+          <select id="f-diff">
+            <option value="">全部难度</option>
+            ${DIFFS.map(d=>`<option value="${d}">${diffLabel(d)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="sel-row"><label>题量</label>
+          <select id="f-count">
+            <option value="10">10 题</option>
+            <option value="20" selected>20 题</option>
+            <option value="30">30 题</option>
+            <option value="0">全部</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-block" id="btn-start" style="margin-top:6px">开始练习</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2 style="margin-bottom:8px">题库分布</h2>
+      <div class="seg">${Object.entries(bySub).map(([s,n])=>`<span class="chip">${esc(s)} · ${n}</span>`).join('')}</div>
+    </div>
+  `;
+
+  $('#btn-start').addEventListener('click', ()=>{
+    const subject = $('#f-subject').value;
+    const diff = $('#f-diff').value;
+    const cnt = parseInt($('#f-count').value, 10);
+    let list = bank.filter(q => (!subject || q.subject === subject) && (!diff || q.difficulty === diff));
+    if(!list.length) return toast('这个筛选条件下没有题目');
+    list = shuffle(list.slice());
+    if(cnt > 0) list = list.slice(0, cnt);
+    quiz.list = list; quiz.idx = 0; quiz.answers = []; quiz.results = [];
+    quiz.subject = subject || (list[0]?.subject || '');
+    quiz.startTs = Date.now();
+    renderQuiz();
+  });
+}
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function renderQuiz(){
+  const view = $('#view');
+  const q = quiz.list[quiz.idx];
+  if(!q) return renderQuizResult();
+  const opts = parseOptions(q.options);
+  const picked = quiz.answers[quiz.idx];
+  const answered = picked !== undefined && quiz.results[quiz.idx] !== undefined;
+  const rightIdx = answerIndex(q.answer, opts);
+  const total = quiz.list.length;
+
+  view.innerHTML = `
+    <div class="card">
+      <div class="between">
+        <div class="row" style="gap:8px">
+          <span class="chip brand">${esc(q.subject||'未分类')}</span>
+          ${q.difficulty?`<span class="chip">${esc(diffLabel(q.difficulty))}</span>`:''}
+        </div>
+        <span class="tiny">${quiz.idx+1} / ${total}</span>
+      </div>
+      <div class="progress" style="margin:14px 0 18px"><i style="width:${(quiz.idx/total*100).toFixed(1)}%"></i></div>
+
+      <div class="q-title">${esc(q.question || '(题干为空)')}</div>
+      <div class="stack" style="margin-top:16px">
+        ${opts.length ? opts.map((o,i)=>{
+          let cls = 'opt';
+          if(answered){
+            if(i === rightIdx) cls += ' correct';
+            else if(i === picked) cls += ' wrong';
+          }else if(picked === i) cls += ' sel';
+          return `<button class="${cls}" data-i="${i}" ${answered?'disabled':''}>
+            <span class="ltr">${LETTERS[i]||i+1}</span><span>${esc(stripLetter(o))}</span></button>`;
+        }).join('') : `<div class="tiny">该题没有选项数据</div>`}
+      </div>
+
+      ${answered ? `
+        <div class="explain">
+          <div><b>正确答案：</b>${rightIdx>=0?(LETTERS[rightIdx]||'')+'、'+esc(stripLetter(opts[rightIdx]||'')):esc(q.answer||'')}</div>
+          <div style="margin-top:6px"><b>你的选择：</b>${picked>=0?LETTERS[picked]:'未作答'} ${quiz.results[quiz.idx]?'✅ 正确':'❌ 错误'}</div>
+          ${q.analysis?`<div style="margin-top:8px"><b>解析：</b>${esc(q.analysis)}</div>`:''}
+        </div>
+        <button class="btn btn-primary btn-block" id="btn-next" style="margin-top:14px">
+          ${quiz.idx+1 === total ? '查看结果' : '下一题'}
+        </button>
+      ` : `
+        <button class="btn btn-primary btn-block" id="btn-submit" style="margin-top:16px" ${picked===undefined?'disabled':''}>提交答案</button>
+      `}
+      <button class="btn btn-sm btn-block" id="btn-quit" style="margin-top:10px;border:none;background:transparent;color:var(--ink3)">结束本次练习</button>
+    </div>
+  `;
+
+  $$('.opt', view).forEach(b => b.addEventListener('click', ()=>{
+    if(answered) return;
+    quiz.answers[quiz.idx] = parseInt(b.dataset.i, 10);
+    renderQuiz();
+  }));
+  $('#btn-submit')?.addEventListener('click', ()=>{
+    const picked2 = quiz.answers[quiz.idx];
+    if(picked2 === undefined) return;
+    const ok = picked2 === rightIdx;
+    quiz.results[quiz.idx] = ok;
+    renderQuiz();
+  });
+  $('#btn-next')?.addEventListener('click', ()=>{
+    if(quiz.idx + 1 >= quiz.list.length) renderQuizResult();
+    else { quiz.idx++; renderQuiz(); }
+  });
+  $('#btn-quit')?.addEventListener('click', ()=>{
+    if(quiz.results.some(r=>r!==undefined)) renderQuizResult();
+    else go('practice');
+  });
+}
+
+async function renderQuizResult(){
+  const view = $('#view');
+  const total = quiz.list.length;
+  const answeredIdx = Object.keys(quiz.results);
+  const right = quiz.results.filter(Boolean).length;
+  const wrong = answeredIdx.length - right;
+  const minutes = Math.max(1, Math.round((Date.now() - quiz.startTs)/60000));
+  const rate = answeredIdx.length ? Math.round(right/answeredIdx.length*100) : 0;
+
+  view.innerHTML = `
+    <div class="card" style="text-align:center">
+      <div class="tiny">本次练习结果</div>
+      <div style="font-size:44px;font-weight:800;letter-spacing:-2px;margin:6px 0">${rate}<span style="font-size:18px">%</span></div>
+      <div class="chip ${rate>=80?'ok':rate>=60?'brand':'err'}">正确率 ${rate}%</div>
+      <div class="grid-stats" style="margin-top:20px">
+        <div class="stat"><div class="k">已答</div><div class="v">${answeredIdx.length}</div></div>
+        <div class="stat"><div class="k">答对</div><div class="v" style="color:var(--ok)">${right}</div></div>
+        <div class="stat"><div class="k">答错</div><div class="v" style="color:var(--err)">${wrong}</div></div>
+        <div class="stat"><div class="k">用时</div><div class="v">${minutes}<span>分</span></div></div>
+      </div>
+      <div class="row" style="margin-top:18px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" data-go="practice">再来一组</button>
+        <button class="btn" data-go="wrong">查看错题本</button>
+      </div>
+      <div class="tiny" style="margin-top:12px" id="save-state">正在保存本次记录…</div>
+    </div>
+  `;
+  bindGo(view);
+
+  try{
+    const subject = quiz.subject || '综合';
+    await insert('practice_records', {
+      user_id: CFG.userId,
+      subject,
+      source: '网页刷题',
+      correct_count: right,
+      question_count: answeredIdx.length,
+      duration_min: minutes,
+      practiced_at: new Date().toISOString(),
+      notes: `本次共答 ${answeredIdx.length} 题，答对 ${right} 题，答错 ${wrong} 题，用时 ${minutes} 分钟`
+    });
+    await insert('study_logs', {
+      user_id: CFG.userId,
+      study_date: todayStr(),
+      total_minutes: minutes,
+      correct_count: right,
+      error_count: wrong,
+      notes: '网页刷题'
+    });
+    const wrongCards = quiz.list.filter((q,i)=> quiz.results[i] === false);
+    if(wrongCards.length){
+      await insert('error_questions', wrongCards.map(q=>{
+        const opts = parseOptions(q.options);
+        return {
+          user_id: CFG.userId,
+          subject: q.subject || '未分类',
+          question_text: q.question || '',
+          options: opts,
+          correct_answer: q.answer || '',
+          user_answer: (()=>{ const i = quiz.answers[quiz.list.indexOf(q)]; return i>=0 ? LETTERS[i] : ''; })(),
+          analysis: q.analysis || '',
+          source: q.source || '网页刷题',
+          review_count: 0,
+          mastery: 0,
+          tags: q.difficulty ? [q.difficulty] : []
+        };
+      }));
+    }
+    $('#save-state').textContent = '✅ 记录已保存，错题已加入错题本';
+  }catch(e){
+    $('#save-state').textContent = '⚠️ ' + friendlyError(e);
+  }
+  quiz.list = []; quiz.results = []; quiz.answers = [];
+}
+
+/* ============ 错题本 ============ */
+let wrongSubject = '';
+async function renderWrong(){
+  const view = $('#view');
+  let rows = await sb('error_questions', '?select=*&order=created_at.desc&limit=200');
+  rows = rows || [];
+  const subs = [...new Set(rows.map(r=>r.subject).filter(Boolean))];
+  if(wrongSubject && !subs.includes(wrongSubject)) wrongSubject = '';
+  const list = wrongSubject ? rows.filter(r=>r.subject===wrongSubject) : rows;
+
+  view.innerHTML = `
+    <div class="card">
+      <div class="between">
+        <div><h1>错题本</h1><div class="tiny" style="margin-top:3px">共 ${rows.length} 道错题，按错因逐个攻克</div></div>
+        <span class="chip err">${rows.length}</span>
+      </div>
+      ${subs.length?`<div class="seg" style="margin-top:14px">
+        <button class="${wrongSubject?'':'on'}" data-sub="">全部</button>
+        ${subs.map(s=>`<button class="${wrongSubject===s?'on':''}" data-sub="${esc(s)}">${esc(s)}</button>`).join('')}
+      </div>`:''}
+    </div>
+
+    ${list.length ? list.map(r=>{
+      const opts = parseOptions(r.options);
+      const rightIdx = answerIndex(r.correct_answer, opts);
+      return `<div class="card">
+        <div class="between" style="margin-bottom:10px">
+          <div class="row" style="gap:6px">
+            <span class="chip brand">${esc(r.subject||'未分类')}</span>
+            ${tagsText(r.tags)?`<span class="chip">${esc(tagsText(r.tags))}</span>`:''}
+            ${r.review_count?`<span class="chip ok">复习 ${r.review_count} 次</span>`:''}
+          </div>
+          <span class="tiny">${r.created_at?dateStr(new Date(r.created_at)):''}</span>
+        </div>
+        <div class="q-title" style="font-size:15px">${esc(r.question_text||'')}</div>
+        <div class="stack" style="margin-top:12px">
+          ${opts.map((o,i)=>`<div class="opt ${i===rightIdx?'correct':''}" style="cursor:default">
+            <span class="ltr">${LETTERS[i]||i+1}</span><span>${esc(stripLetter(o))}</span></div>`).join('')}
+        </div>
+        <div class="explain" style="margin-top:12px">
+          <div><b>正确答案：</b>${rightIdx>=0?LETTERS[rightIdx]:esc(r.correct_answer||'')}
+            ${r.user_answer?` · <b>你选：</b><span style="color:var(--err)">${esc(r.user_answer)}</span>`:''}</div>
+          ${r.analysis?`<div style="margin-top:6px"><b>解析：</b>${esc(r.analysis)}</div>`:''}
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn btn-sm" data-review="${r.id}">复习 +1</button>
+          <button class="btn btn-sm btn-ok" data-master="${r.id}">已掌握，移除</button>
+        </div>
+      </div>`;
+    }).join('') : `<div class="card">${emptyState('🎉','暂时没有错题','保持这个状态，去刷题吧')}</div>`}
+  `;
+
+  $$('[data-sub]', view).forEach(b=>b.addEventListener('click', ()=>{ wrongSubject = b.dataset.sub; renderWrong(); }));
+  $$('[data-review]', view).forEach(b=>b.addEventListener('click', async ()=>{
+    const id = b.dataset.review;
+    try{
+      const cur = rows.find(r=>String(r.id)===id);
+      await patch('error_questions', `?id=eq.${id}`, { review_count: (cur?.review_count||0)+1, updated_at: new Date().toISOString() });
+      toast('已记录一次复习'); renderWrong();
+    }catch(e){ toast(friendlyError(e), 3000); }
+  }));
+  $$('[data-master]', view).forEach(b=>b.addEventListener('click', async ()=>{
+    try{ await del('error_questions', `?id=eq.${b.dataset.master}`); toast('已移出错题本 ✅'); renderWrong(); }
+    catch(e){ toast(friendlyError(e), 3000); }
+  }));
+}
+
+/* ============ 记录 ============ */
+async function renderRecords(){
+  const view = $('#view');
+  const [logs, records] = await Promise.all([
+    sb('study_logs', '?select=*&order=study_date.desc&limit=60'),
+    sb('practice_records', '?select=*&order=created_at.desc&limit=30')
+  ]);
+  const L = logs||[], R = records||[];
+
+  // 近 7 天
+  const days = [];
+  for(let i=6;i>=0;i--){ const d = new Date(); d.setDate(d.getDate()-i); days.push(dateStr(d)); }
+  const mins = days.map(d => L.filter(x=>x.study_date===d).reduce((s,x)=>s+(x.total_minutes||0),0));
+  const maxMin = Math.max(...mins, 1);
+  const totalWeek = mins.reduce((a,b)=>a+b,0);
+  const totalQ = L.reduce((s,x)=>s+(x.correct_count||0)+(x.error_count||0),0);
+  const totalC = L.reduce((s,x)=>s+(x.correct_count||0),0);
+
+  view.innerHTML = `
+    <div class="card">
+      <h1>学习记录</h1>
+      <div class="grid-stats" style="margin-top:16px">
+        <div class="stat"><div class="k">近 7 天时长</div><div class="v">${totalWeek}<span>分</span></div></div>
+        <div class="stat"><div class="k">累计刷题</div><div class="v">${totalQ}<span>题</span></div></div>
+        <div class="stat"><div class="k">累计正确率</div><div class="v">${totalQ?Math.round(totalC/totalQ*100):0}<span>%</span></div></div>
+        <div class="stat"><div class="k">练习次数</div><div class="v">${R.length}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:8px">近 7 天学习时长（分钟）</h2>
+      <div class="chart">
+        ${days.map((d,i)=>`
+          <div class="col">
+            <div class="val">${mins[i]||''}</div>
+            <div class="bar ${mins[i]?'':'zero'}" style="height:${mins[i]?(mins[i]/maxMin*100).toFixed(0):4}%"></div>
+            <div class="lb">${d.slice(5)}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:6px">最近练习</h2>
+      ${R.length ? R.map(r=>`
+        <div class="list-item">
+          <div style="flex:1;min-width:0">
+            <div class="row" style="gap:8px">
+              <span class="chip brand">${esc(r.subject||'综合')}</span>
+              <span class="chip ok">答对 ${r.correct_count||0}</span>
+              ${r.source?`<span class="chip">${esc(r.source)}</span>`:''}
+            </div>
+            <div class="small muted" style="margin-top:6px">${esc(r.notes||'')}</div>
+          </div>
+          <div class="tiny" style="white-space:nowrap">${r.created_at?dateStr(new Date(r.created_at)):''}</div>
+        </div>`).join('') : emptyState('📭','还没有练习记录','去刷一组题就会自动记录')}
+    </div>
+  `;
+}
+
+/* ============ 番茄钟 ============ */
+const POMO_KEY = 'gk_pomodoro_v1';
+let pomoState = null, pomoTimer = null;
+
+function loadPomo(){
+  try{ pomoState = JSON.parse(localStorage.getItem(POMO_KEY) || 'null'); }catch(e){ pomoState = null; }
+  if(!pomoState) pomoState = { mode:'work', running:false, remain:25*60, endAt:0, subject:'' };
+  if(pomoState.running && pomoState.endAt){
+    const left = Math.round((pomoState.endAt - Date.now())/1000);
+    if(left <= 0){ pomoState.running = false; pomoState.remain = 0; pomoState.finished = true; }
+    else pomoState.remain = left;
+  }
+  return pomoState;
+}
+function savePomo(){ localStorage.setItem(POMO_KEY, JSON.stringify(pomoState)); }
+
+async function renderPomodoro(){
+  const view = $('#view');
+  const st = loadPomo();
+  const total = st.mode === 'work' ? 25*60 : 5*60;
+  const today = todayStr();
+  const sessions = await sb('pomodoro_sessions', '?select=*&order=started_at.desc&limit=100').catch(()=>[]);
+  const todayList = (sessions||[]).filter(s => s.started_at && dateStr(new Date(s.started_at)) === today);
+  const done = todayList.filter(s => s.completed).length;
+  const mins = todayList.length * 25;
+
+  view.innerHTML = `
+    <div class="card">
+      <div class="between">
+        <div><h1>番茄钟</h1><div class="tiny" style="margin-top:3px">专注 25 分钟，休息 5 分钟</div></div>
+        <div class="row" style="gap:8px">
+          <span class="chip ok">今日 ${done} 个</span>
+          <span class="chip">${mins} 分钟</span>
+        </div>
+      </div>
+
+      <div class="timer" style="margin-top:18px">
+        <div class="ring">
+          <svg width="210" height="210" viewBox="0 0 210 210">
+            <circle cx="105" cy="105" r="92" fill="none" stroke="#eceef6" stroke-width="14"/>
+            <circle id="ring-fg" cx="105" cy="105" r="92" fill="none" stroke="url(#g)" stroke-width="14"
+              stroke-linecap="round" stroke-dasharray="${2*Math.PI*92}" stroke-dashoffset="${2*Math.PI*92}" />
+            <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
+          </svg>
+          <div class="time">
+            <b id="pomo-time">${fmtSec(st.remain)}</b>
+            <span id="pomo-mode">${st.mode==='work'?'专注中':'休息中'}</span>
+          </div>
+        </div>
+        <div class="seg" style="margin-top:16px">
+          <button class="${st.mode==='work'?'on':''}" data-mode="work">专注 25 分</button>
+          <button class="${st.mode==='break'?'on':''}" data-mode="break">休息 5 分</button>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn btn-primary" id="pomo-toggle" style="min-width:110px">${st.running?'暂停':'开始'}</button>
+          <button class="btn" id="pomo-reset">重置</button>
+        </div>
+        <div class="sel-row" style="margin-top:18px;max-width:340px;width:100%">
+          <label>学习科目</label>
+          <select id="pomo-subject">
+            <option value="">未指定</option>
+            ${SUBJECTS.map(s=>`<option value="${s}" ${st.subject===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:6px">今日番茄</h2>
+      ${todayList.length ? todayList.map(s=>`
+        <div class="list-item">
+          <div style="flex:1">
+            <div class="row" style="gap:8px">
+              <span class="chip ${s.completed?'ok':''}">${s.completed?'已完成':'未完成'}</span>
+              <span class="chip brand">${esc(s.subject||'未指定')}</span>
+            </div>
+            <div class="tiny" style="margin-top:5px">${s.started_at?new Date(s.started_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}):''} 开始</div>
+          </div>
+        </div>`).join('') : emptyState('⏱️','今天还没开始专注','点上面的「开始」，25 分钟后再回来')}
+    </div>
+  `;
+
+  updateRing(st, total);
+  $$('[data-mode]', view).forEach(b=>b.addEventListener('click', ()=>{
+    if(st.running) return toast('请先暂停或重置');
+    st.mode = b.dataset.mode; st.remain = st.mode==='work'?25*60:5*60; st.finished=false;
+    savePomo(); renderPomodoro();
+  }));
+  $('#pomo-subject')?.addEventListener('change', e=>{ st.subject = e.target.value; savePomo(); });
+  $('#pomo-toggle')?.addEventListener('click', ()=> togglePomo(st));
+  $('#pomo-reset')?.addEventListener('click', ()=>{
+    st.running=false; st.mode='work'; st.remain=25*60; st.finished=false; st.startTs=0; st.endAt=0;
+    savePomo(); renderPomodoro();
+  });
+
+  clearInterval(pomoTimer);
+  if(st.running){
+    pomoTimer = setInterval(()=>{
+      const left = Math.max(0, Math.round((st.endAt - Date.now())/1000));
+      st.remain = left;
+      const t = $('#pomo-time'); if(t) t.textContent = fmtSec(left);
+      updateRing(st, total);
+      if(left <= 0){ clearInterval(pomoTimer); finishPomo(st); }
+    }, 500);
+  }
+}
+function fmtSec(s){ s=Math.max(0,s); return `${pad(Math.floor(s/60))}:${pad(s%60)}`; }
+function updateRing(st, total){
+  const ring = $('#ring-fg'); if(!ring) return;
+  const C = 2*Math.PI*92;
+  const ratio = Math.max(0, Math.min(1, st.remain / total));
+  ring.style.strokeDashoffset = (C * (1-ratio)).toFixed(1);
+}
+async function togglePomo(st){
+  if(st.running){
+    st.running = false; st.remain = Math.max(0, Math.round((st.endAt - Date.now())/1000));
+    savePomo(); renderPomodoro(); return;
+  }
+  if(st.remain <= 0) st.remain = st.mode==='work'?25*60:5*60;
+  st.running = true; st.startTs = Date.now(); st.endAt = Date.now() + st.remain*1000;
+  savePomo(); renderPomodoro();
+}
+async function finishPomo(st){
+  st.running = false; st.remain = 0; savePomo();
+  try{
+    await insert('pomodoro_sessions', {
+      user_id: CFG.userId,
+      subject: st.subject || '未指定',
+      started_at: new Date(st.startTs || Date.now()).toISOString(),
+      ended_at: new Date().toISOString(),
+      session_type: 'focus',
+      duration_min: 25,
+      completed: true
+    });
+    if(st.mode === 'work'){
+      await insert('study_logs', {
+        user_id: CFG.userId, study_date: todayStr(), total_minutes: 25,
+        correct_count: 0, error_count: 0, notes: '番茄钟专注'
+      });
+    }
+    toast('🍅 完成一个番茄，休息一下吧');
+  }catch(e){ toast('计时完成，但记录保存失败：' + friendlyError(e), 3200); }
+  st.mode = 'break'; st.remain = 5*60; savePomo();
+  renderPomodoro();
+}
+
+/* ============ 待办 ============ */
+async function renderTodos(){
+  const view = $('#view');
+  const rows = (await sb('todos', '?select=*&order=created_at.desc&limit=200')) || [];
+  const pending = rows.filter(r => r.status !== 'done');
+  const doneList = rows.filter(r => r.status === 'done');
+  const priColor = p => p === '高' ? 'err' : p === '低' ? 'ok' : 'brand';
+
+  view.innerHTML = `
+    <div class="card">
+      <h1>待办清单</h1>
+      <div class="tiny" style="margin-top:3px">今日待办 ${pending.length} 项，已完成 ${doneList.length} 项</div>
+      <div class="stack" style="margin-top:16px">
+        <input type="text" id="todo-title" placeholder="要做什么？例如：资料分析 20 题" maxlength="80" />
+        <div class="row">
+          <input type="date" id="todo-date" style="flex:1" />
+          <button class="btn btn-primary" id="todo-add">添加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:8px">进行中</h2>
+      ${pending.length ? pending.map(t=>`
+        <div class="list-item">
+          <button class="btn btn-sm" data-done="${t.id}" style="width:30px;height:30px;padding:0;border-radius:9px;flex:none" title="标记完成">○</button>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600">${esc(t.title||'')}</div>
+            <div class="row" style="gap:6px;margin-top:5px">
+              ${t.due_date?`<span class="chip">截止 ${esc(t.due_date)}</span>`:''}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-err" data-del="${t.id}" style="flex:none">删除</button>
+        </div>`).join('') : emptyState('☀️','今天没有待办','给今天定一个小目标吧')}
+    </div>
+
+    ${doneList.length?`<div class="card">
+      <h2 style="margin-bottom:8px">已完成 ${doneList.length}</h2>
+      ${doneList.slice(0,20).map(t=>`
+        <div class="list-item">
+          <span style="color:var(--ok);font-weight:700">✓</span>
+          <div style="flex:1"><span class="muted" style="text-decoration:line-through">${esc(t.title||'')}</span></div>
+          <button class="btn btn-sm" data-del="${t.id}" style="flex:none">删除</button>
+        </div>`).join('')}
+    </div>`:''}
+  `;
+
+  $('#todo-add')?.addEventListener('click', async ()=>{
+    const title = $('#todo-title').value.trim();
+    if(!title) return toast('先写点内容吧');
+    const body = { user_id: CFG.userId, title, status: 'todo', notes: '' };
+    const d = $('#todo-date').value; if(d) body.due_date = d;
+    try{ await insert('todos', body); toast('已添加'); renderTodos(); }
+    catch(e){ toast(friendlyError(e), 3200); }
+  });
+  $$('[data-done]', view).forEach(b=>b.addEventListener('click', async ()=>{
+    try{ await patch('todos', `?id=eq.${b.dataset.done}`, { status:'done', updated_at:new Date().toISOString() }); renderTodos(); }
+    catch(e){ toast(friendlyError(e), 3200); }
+  }));
+  $$('[data-del]', view).forEach(b=>b.addEventListener('click', async ()=>{
+    try{ await del('todos', `?id=eq.${b.dataset.del}`); renderTodos(); }
+    catch(e){ toast(friendlyError(e), 3200); }
+  }));
+}
+
+/* ============ 启动 ============ */
+route();
 </script>
 </body>
 </html>
