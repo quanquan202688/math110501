@@ -913,37 +913,41 @@ const SCAN_BUCKET = 'wrong-images';
 /* 上传图片到云存储，返回公开地址（文件名必须纯 ASCII，中文会被 Supabase 拒绝） */
 const SCAN_SUB_CODE = { '常识判断':'cs','言语理解':'yy','数量关系':'sl','判断推理':'pd','资料分析':'zl','公共基础知识':'gk','其他':'qt','未分类':'fl' };
 const SCAN_CODE_SUB = Object.fromEntries(Object.entries(SCAN_SUB_CODE).map(([k,v])=>[v,k]));
-async function uploadScanImage(blob, subject, attempt = 0){
+async function uploadScanImage(blob, subject){
   const tag = SCAN_SUB_CODE[subject] || 'misc';
   const fname = `scan-${Date.now()}-${tag}.jpg`;
-  let res;
-  try{
-    res = await fetch(`${CFG.url}/storage/v1/object/${SCAN_BUCKET}/${fname}`, {
-      method: 'POST',
-      headers: {
-        'apikey': CFG.key,
-        'Authorization': 'Bearer ' + CFG.key,
-        'Content-Type': 'image/jpeg',
-        'x-upsert': 'true'
-      },
-      body: blob
-    });
-  }catch(err){
-    // 网络抖动自动重试一次
-    if(attempt < 1){
-      await new Promise(r=>setTimeout(r, 1200));
-      return uploadScanImage(blob, subject, attempt + 1);
+  const upUrl = `${CFG.url}/storage/v1/object/${SCAN_BUCKET}/${fname}`;
+  const delays = [0, 1500, 3500];   // 共尝试 3 次
+  let lastErr = null;
+  for(let i=0;i<delays.length;i++){
+    if(delays[i]) await new Promise(r=>setTimeout(r, delays[i]));
+    try{
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 45000);   // 单次 45 秒超时
+      const res = await fetch(upUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': CFG.key,
+          'Authorization': 'Bearer ' + CFG.key,
+          'Content-Type': 'image/jpeg',
+          'x-upsert': 'true'
+        },
+        body: blob,
+        signal: ctrl.signal
+      });
+      clearTimeout(timer);
+      if(res.ok) return { url: `${CFG.url}/storage/v1/object/public/${SCAN_BUCKET}/${fname}`, name: fname };
+      const em = await res.json().catch(()=>({}));
+      const msg = em.message || em.error || ('HTTP ' + res.status);
+      if(/bucket.*not.*found|does not exist/i.test(msg)) throw new Error('图片存储桶未创建：请先在 SQL Editor 执行 storage_setup.sql');
+      if(/row-level security|403|permission/i.test(msg)) throw new Error('存储权限不足：请先在 SQL Editor 执行 storage_setup.sql');
+      lastErr = new Error(msg);
+    }catch(e){
+      if(/^图片存储桶|^存储权限/.test(e.message)) throw e;   // 配置类错误不用重试
+      lastErr = e;                                            // 网络类错误继续重试
     }
-    throw new Error('网络不稳导致上传失败：请再点一次「保存到题库」重试，或换个网络（Wi-Fi/流量切换）');
   }
-  if(!res.ok){
-    const em = await res.json().catch(()=>({}));
-    const msg = em.message || em.error || ('HTTP ' + res.status);
-    if(/bucket.*not.*found|does not exist/i.test(msg)) throw new Error('图片存储桶未创建：请先在 SQL Editor 执行 storage_setup.sql');
-    if(/row-level security|403|permission/i.test(msg)) throw new Error('存储权限不足：请先在 SQL Editor 执行 storage_setup.sql');
-    throw new Error('图片上传失败：' + msg);
-  }
-  return { url: `${CFG.url}/storage/v1/object/public/${SCAN_BUCKET}/${fname}`, name: fname };
+  throw new Error('连续 3 次上传失败（' + String(lastErr && lastErr.message || lastErr).slice(0, 60) + '）。当前网络到图片服务器不稳定，建议：切换 Wi-Fi / 流量后再试，或过一会儿再试');
 }
 
 /* 列出存储桶里的全部图片 */
@@ -1404,6 +1408,11 @@ function openScanEditor(file){
       if(currentRoute() === 'scan') renderScan();
     }catch(e){
       state.textContent = '⚠️ ' + friendlyError(e);
+      // 兜底：处理好的图片下载到本地，避免白拍
+      try{
+        await saveBlobAs(blob, `扫描件-本地备份-${Date.now()}.jpg`);
+        state.textContent += '｜已把处理好的图片下载到手机本地备份，可在相册查看';
+      }catch(_){}
       btn.disabled = false; btn.textContent = '保存到题库';
     }
   });
