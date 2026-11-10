@@ -908,9 +908,11 @@ function openWrongForm(){
 /* ============ 拍照扫描：裁剪矫正 + 清晰度增强 + 图片库 ============ */
 const SCAN_BUCKET = 'wrong-images';
 
-/* 上传图片到云存储，返回公开地址 */
+/* 上传图片到云存储，返回公开地址（文件名必须纯 ASCII，中文会被 Supabase 拒绝） */
+const SCAN_SUB_CODE = { '常识判断':'cs','言语理解':'yy','数量关系':'sl','判断推理':'pd','资料分析':'zl','公共基础知识':'gk','其他':'qt','未分类':'fl' };
+const SCAN_CODE_SUB = Object.fromEntries(Object.entries(SCAN_SUB_CODE).map(([k,v])=>[v,k]));
 async function uploadScanImage(blob, subject){
-  const tag = encodeURIComponent(subject || 'scan').replace(/%2F/gi, '');
+  const tag = SCAN_SUB_CODE[subject] || 'misc';
   const fname = `scan-${Date.now()}-${tag}.jpg`;
   const res = await fetch(`${CFG.url}/storage/v1/object/${SCAN_BUCKET}/${fname}`, {
     method: 'POST',
@@ -1038,13 +1040,12 @@ async function renderScan(){
         <button class="btn btn-sm btn-primary" id="scan-dl-all" ${files.length?'':'disabled'}>⬇ 一键下载全部</button>
       </div>
       ${files.length ? `<div class="scan-grid">${files.map((f,i)=>{
-        let nm = f.name;
-        try{ nm = decodeURIComponent(f.name); }catch(e){}
-        nm = nm.replace(/^scan-\d+-?/, '扫描件-');
+        let nm = f.name.replace(/^scan-\d+-?/, '').replace(/\.jpg$/i, '').replace(/^wrong-\d+$/, '错题拍照');
+        if(SCAN_CODE_SUB[nm]) nm = SCAN_CODE_SUB[nm];
         return `<div class="scan-item">
           <img class="scan-thumb" src="${esc(f.url)}" data-view="${esc(f.url)}" alt="扫描件" loading="lazy" />
           <div class="scan-meta">
-            <div class="nm" title="${esc(nm)}">${esc(nm)}</div>
+            <div class="nm" title="${esc(f.name)}">${esc(nm)}</div>
             <div class="tiny" style="margin-top:2px">${f.created?dateStr(new Date(f.created)):''}</div>
             <div class="scan-acts">
               <button class="btn btn-sm btn-ok" data-dl="${i}">⬇ 下载</button>
