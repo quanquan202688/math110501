@@ -913,19 +913,29 @@ const SCAN_BUCKET = 'wrong-images';
 /* 上传图片到云存储，返回公开地址（文件名必须纯 ASCII，中文会被 Supabase 拒绝） */
 const SCAN_SUB_CODE = { '常识判断':'cs','言语理解':'yy','数量关系':'sl','判断推理':'pd','资料分析':'zl','公共基础知识':'gk','其他':'qt','未分类':'fl' };
 const SCAN_CODE_SUB = Object.fromEntries(Object.entries(SCAN_SUB_CODE).map(([k,v])=>[v,k]));
-async function uploadScanImage(blob, subject){
+async function uploadScanImage(blob, subject, attempt = 0){
   const tag = SCAN_SUB_CODE[subject] || 'misc';
   const fname = `scan-${Date.now()}-${tag}.jpg`;
-  const res = await fetch(`${CFG.url}/storage/v1/object/${SCAN_BUCKET}/${fname}`, {
-    method: 'POST',
-    headers: {
-      'apikey': CFG.key,
-      'Authorization': 'Bearer ' + CFG.key,
-      'Content-Type': 'image/jpeg',
-      'x-upsert': 'true'
-    },
-    body: blob
-  });
+  let res;
+  try{
+    res = await fetch(`${CFG.url}/storage/v1/object/${SCAN_BUCKET}/${fname}`, {
+      method: 'POST',
+      headers: {
+        'apikey': CFG.key,
+        'Authorization': 'Bearer ' + CFG.key,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'true'
+      },
+      body: blob
+    });
+  }catch(err){
+    // 网络抖动自动重试一次
+    if(attempt < 1){
+      await new Promise(r=>setTimeout(r, 1200));
+      return uploadScanImage(blob, subject, attempt + 1);
+    }
+    throw new Error('网络不稳导致上传失败：请再点一次「保存到题库」重试，或换个网络（Wi-Fi/流量切换）');
+  }
   if(!res.ok){
     const em = await res.json().catch(()=>({}));
     const msg = em.message || em.error || ('HTTP ' + res.status);
