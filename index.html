@@ -141,10 +141,27 @@ select:focus,input:focus,textarea:focus{border-color:#b9bdf0;box-shadow:0 0 0 3p
 .wm-file-row{display:flex;gap:8px;flex-wrap:wrap}
 .btn-camera{position:relative;overflow:hidden}
 .btn-camera input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+/* ---- 拍照扫描 ---- */
+.scan-stage{position:relative;background:#0f1117;border-radius:12px;overflow:hidden;touch-action:none;line-height:0}
+.scan-stage canvas{width:100%;display:block}
+.scan-quad{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.scan-handle{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;background:rgba(255,255,255,.92);border:3px solid var(--brand);box-shadow:0 2px 10px rgba(0,0,0,.45);touch-action:none;cursor:grab;z-index:3}
+.scan-handle:active{cursor:grabbing;transform:scale(1.08)}
+.scan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:12px;margin-top:14px}
+.scan-item{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.scan-thumb{width:100%;height:130px;object-fit:cover;background:#f1f2f8;display:block;cursor:zoom-in}
+.scan-meta{padding:8px 9px}
+.scan-meta .nm{font-size:11.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scan-acts{display:flex;gap:6px;margin-top:6px}
+.scan-acts .btn{flex:1;padding:5px 6px;font-size:12px}
+.prog{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:10px;display:none}
+.prog>div{height:100%;width:0;background:var(--brand);transition:width .25s}
 </style>
 </head>
 <!-- OCR 引擎（Tesseract.js，浏览器本地识别，支持中文） -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- 打包下载（JSZip，一键下载全部图片为 zip） -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
 <body>
 <header class="header">
   <div class="header-inner">
@@ -153,6 +170,7 @@ select:focus,input:focus,textarea:focus{border-color:#b9bdf0;box-shadow:0 0 0 3p
       <a href="#/home" data-r="home">首页</a>
       <a href="#/practice" data-r="practice">刷题</a>
       <a href="#/wrong" data-r="wrong">错题本</a>
+      <a href="#/scan" data-r="scan">扫描</a>
       <a href="#/records" data-r="records">记录</a>
       <a href="#/pomodoro" data-r="pomodoro">番茄钟</a>
       <a href="#/todos" data-r="todos">待办</a>
@@ -262,7 +280,7 @@ function answerIndex(answer, options){
 const LETTERS = ['A','B','C','D','E','F'];
 
 /* ============ 路由 ============ */
-const routes = { home: renderHome, practice: renderPractice, wrong: renderWrong, records: renderRecords, pomodoro: renderPomodoro, todos: renderTodos };
+const routes = { home: renderHome, practice: renderPractice, wrong: renderWrong, scan: renderScan, records: renderRecords, pomodoro: renderPomodoro, todos: renderTodos };
 function go(r){ location.hash = '#/' + r; }
 function currentRoute(){
   const h = (location.hash || '').replace(/^#\/?/, '');
@@ -884,6 +902,460 @@ function openWrongForm(){
       toast('已加入错题本 ✅');
       renderWrong();
     }catch(e){ toast(friendlyError(e), 4000); btn.disabled = false; btn.textContent = '保存到错题本'; }
+  });
+}
+
+/* ============ 拍照扫描：裁剪矫正 + 清晰度增强 + 图片库 ============ */
+const SCAN_BUCKET = 'wrong-images';
+
+/* 上传图片到云存储，返回公开地址 */
+async function uploadScanImage(blob, subject){
+  const tag = encodeURIComponent(subject || 'scan').replace(/%2F/gi, '');
+  const fname = `scan-${Date.now()}-${tag}.jpg`;
+  const res = await fetch(`${CFG.url}/storage/v1/object/${SCAN_BUCKET}/${fname}`, {
+    method: 'POST',
+    headers: {
+      'apikey': CFG.key,
+      'Authorization': 'Bearer ' + CFG.key,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true'
+    },
+    body: blob
+  });
+  if(!res.ok){
+    const em = await res.json().catch(()=>({}));
+    const msg = em.message || em.error || ('HTTP ' + res.status);
+    if(/bucket.*not.*found|does not exist/i.test(msg)) throw new Error('图片存储桶未创建：请先在 SQL Editor 执行 storage_setup.sql');
+    if(/row-level security|403|permission/i.test(msg)) throw new Error('存储权限不足：请先在 SQL Editor 执行 storage_setup.sql');
+    throw new Error('图片上传失败：' + msg);
+  }
+  return { url: `${CFG.url}/storage/v1/object/public/${SCAN_BUCKET}/${fname}`, name: fname };
+}
+
+/* 列出存储桶里的全部图片 */
+async function listScans(){
+  const out = [];
+  try{
+    const res = await fetch(`${CFG.url}/storage/v1/object/list/${SCAN_BUCKET}`, {
+      method: 'POST',
+      headers: { 'apikey': CFG.key, 'Authorization': 'Bearer ' + CFG.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix: '', limit: 200, offset: 0, sortBy: { column: 'created_at', order: 'desc' } })
+    });
+    if(res.ok){
+      const arr = await res.json();
+      (arr || []).forEach(o=>{
+        if(!o.name || o.name.indexOf('/') >= 0) return;
+        out.push({
+          name: o.name,
+          url: `${CFG.url}/storage/v1/object/public/${SCAN_BUCKET}/${o.name}`,
+          created: o.created_at || o.updated_at || null
+        });
+      });
+    }
+  }catch(e){ /* 网络异常时静默，页面显示空态 */ }
+  return out;
+}
+
+const scanName = (f, i)=>{
+  const d = f.created ? new Date(f.created) : new Date();
+  const ymd = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+  return `扫描件-${ymd}-${String(i+1).padStart(2,'0')}.jpg`;
+};
+
+async function saveBlobAs(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 6000);
+}
+
+async function downloadOneScan(url, filename){
+  toast('正在下载…');
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    await saveBlobAs(await r.blob(), filename);
+    toast('已开始下载 ✅');
+  }catch(e){
+    window.open(url, '_blank');
+    toast('已打开原图，长按或右键保存', 3000);
+  }
+}
+
+async function downloadAllScans(files){
+  if(!files.length) return;
+  const prog = $('#scan-prog'), bar = prog ? prog.querySelector('div') : null;
+  if(!window.JSZip){
+    for(let i=0;i<files.length;i++){
+      await downloadOneScan(files[i].url, scanName(files[i], i));
+      await new Promise(r=>setTimeout(r, 350));
+    }
+    return;
+  }
+  if(prog){ prog.style.display = 'block'; if(bar) bar.style.width = '2%'; }
+  toast(`正在打包 ${files.length} 张图片…`, 4000);
+  try{
+    const zip = new JSZip();
+    const folder = zip.folder('公考扫描件');
+    for(let i=0;i<files.length;i++){
+      try{
+        const r = await fetch(files[i].url);
+        if(r.ok) folder.file(scanName(files[i], i), await r.blob());
+      }catch(e){}
+      if(bar) bar.style.width = Math.round((i+1)/files.length*90)+'%';
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    if(bar) bar.style.width = '100%';
+    await saveBlobAs(blob, `公考扫描件-${todayStr()}.zip`);
+    toast('打包下载完成 ✅');
+  }catch(e){
+    toast('打包失败：' + friendlyError(e) + '，可逐张下载', 4000);
+  }finally{
+    setTimeout(()=>{ if(prog){ prog.style.display = 'none'; if(bar) bar.style.width = '0'; } }, 800);
+  }
+}
+
+/* ---- 扫描题库页面 ---- */
+let scanFiles = [];
+async function renderScan(){
+  const view = $('#view');
+  view.innerHTML = loading();
+  const files = await listScans();
+  scanFiles = files;
+  view.innerHTML = `
+    <div class="card">
+      <h1>扫描题库</h1>
+      <div class="tiny" style="margin-top:4px">拍照 → 拖动四角裁剪拉直 → 增强清晰度 → 存入题库</div>
+      <button class="btn btn-primary btn-block" id="scan-take" style="margin-top:14px">📷 拍照 / 上传图片</button>
+      <input type="file" id="scan-file" accept="image/*" capture="environment" style="display:none" />
+      <div class="prog" id="scan-prog"><div></div></div>
+    </div>
+    <div class="card">
+      <div class="between" style="flex-wrap:wrap;gap:8px">
+        <div><h2 style="margin:0">我的扫描件</h2>
+          <div class="tiny" style="margin-top:3px">共 ${files.length} 张 · 全部存在云端，换手机也能看到</div></div>
+        <button class="btn btn-sm btn-primary" id="scan-dl-all" ${files.length?'':'disabled'}>⬇ 一键下载全部</button>
+      </div>
+      ${files.length ? `<div class="scan-grid">${files.map((f,i)=>{
+        let nm = f.name;
+        try{ nm = decodeURIComponent(f.name); }catch(e){}
+        nm = nm.replace(/^scan-\d+-?/, '扫描件-');
+        return `<div class="scan-item">
+          <img class="scan-thumb" src="${esc(f.url)}" data-view="${esc(f.url)}" alt="扫描件" loading="lazy" />
+          <div class="scan-meta">
+            <div class="nm" title="${esc(nm)}">${esc(nm)}</div>
+            <div class="tiny" style="margin-top:2px">${f.created?dateStr(new Date(f.created)):''}</div>
+            <div class="scan-acts">
+              <button class="btn btn-sm btn-ok" data-dl="${i}">⬇ 下载</button>
+              <button class="btn btn-sm" data-del="${i}">删除</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}</div>`
+      : `<div style="margin-top:8px">${emptyState('📷','还没有扫描件','点上面的按钮拍第一张，裁剪增强后自动存入题库')}</div>`}
+    </div>
+  `;
+
+  $('#scan-take').addEventListener('click', ()=>$('#scan-file').click());
+  $('#scan-file').addEventListener('change', e=>{
+    const f = e.target.files && e.target.files[0];
+    if(f) openScanEditor(f);
+    e.target.value = '';
+  });
+  $$('[data-dl]', view).forEach(b=>b.addEventListener('click', ()=>{
+    const i = +b.dataset.dl; downloadOneScan(scanFiles[i].url, scanName(scanFiles[i], i));
+  }));
+  $$('[data-view]', view).forEach(img=>img.addEventListener('click', ()=>{ window.open(img.dataset.view, '_blank'); }));
+  $$('[data-del]', view).forEach(b=>b.addEventListener('click', async ()=>{
+    const f = scanFiles[+b.dataset.del];
+    if(!confirm('确定删除这张扫描件？删除后不可恢复')) return;
+    try{
+      const res = await fetch(`${CFG.url}/storage/v1/object/${SCAN_BUCKET}/${f.name}`, {
+        method: 'DELETE', headers: { 'apikey': CFG.key, 'Authorization': 'Bearer ' + CFG.key }
+      });
+      if(!res.ok){ const em = await res.json().catch(()=>({})); throw new Error(em.message || ('HTTP ' + res.status)); }
+      toast('已删除');
+      renderScan();
+    }catch(e){ toast('删除失败：' + friendlyError(e), 3000); }
+  }));
+  $('#scan-dl-all').addEventListener('click', ()=>downloadAllScans(scanFiles));
+}
+
+/* ---- 四点透视矫正 + 清晰度增强 ---- */
+function solveHomography(from, to){
+  const A = [], b = [];
+  for(let i=0;i<4;i++){
+    const u = from[i].x, v = from[i].y, x = to[i].x, y = to[i].y;
+    A.push([u,v,1,0,0,0,-u*x,-v*x]); b.push(x);
+    A.push([0,0,0,u,v,1,-u*y,-v*y]); b.push(y);
+  }
+  for(let i=0;i<8;i++){
+    let p = i;
+    for(let r=i+1;r<8;r++) if(Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+    [A[i], A[p]] = [A[p], A[i]];
+    [b[i], b[p]] = [b[p], b[i]];
+    const piv = A[i][i] || 1e-9;
+    for(let r=i+1;r<8;r++){
+      const f = A[r][i] / piv;
+      if(!f) continue;
+      for(let c=i;c<8;c++) A[r][c] -= f * A[i][c];
+      b[r] -= f * b[i];
+    }
+  }
+  const h = new Array(8);
+  for(let i=7;i>=0;i--){
+    let s = b[i];
+    for(let c=i+1;c<8;c++) s -= A[i][c] * h[c];
+    h[i] = s / (A[i][i] || 1e-9);
+  }
+  return h;
+}
+
+function warpPerspective(srcCanvas, quad, outW, outH){
+  const sw = srcCanvas.width, sh = srcCanvas.height;
+  const sd = srcCanvas.getContext('2d').getImageData(0, 0, sw, sh).data;
+  const h = solveHomography(
+    [{x:0,y:0},{x:outW,y:0},{x:outW,y:outH},{x:0,y:outH}],
+    quad
+  );
+  const out = new ImageData(outW, outH);
+  const d = out.data;
+  for(let y=0;y<outH;y++){
+    const v = y + 0.5;
+    for(let x=0;x<outW;x++){
+      const u = x + 0.5;
+      const den = h[6]*u + h[7]*v + 1 || 1e-9;
+      const sx = (h[0]*u + h[1]*v + h[2]) / den;
+      const sy = (h[3]*u + h[4]*v + h[5]) / den;
+      let r = 255, g = 255, bl = 255;
+      if(sx >= 0 && sy >= 0 && sx < sw-1 && sy < sh-1){
+        const x0 = sx|0, y0 = sy|0, fx = sx-x0, fy = sy-y0;
+        const i00 = (y0*sw+x0)*4, i10 = i00+4, i01 = i00+sw*4, i11 = i01+4;
+        const w00 = (1-fx)*(1-fy), w10 = fx*(1-fy), w01 = (1-fx)*fy, w11 = fx*fy;
+        r  = sd[i00]*w00   + sd[i10]*w10   + sd[i01]*w01   + sd[i11]*w11;
+        g  = sd[i00+1]*w00 + sd[i10+1]*w10 + sd[i01+1]*w01 + sd[i11+1]*w11;
+        bl = sd[i00+2]*w00 + sd[i10+2]*w10 + sd[i01+2]*w01 + sd[i11+2]*w11;
+      }
+      const o = (y*outW+x)*4;
+      d[o] = r; d[o+1] = g; d[o+2] = bl; d[o+3] = 255;
+    }
+  }
+  return out;
+}
+
+function sharpenData(imgData, amount){
+  const { width:w, height:h, data:d } = imgData;
+  const src = new Uint8ClampedArray(d);
+  for(let y=1;y<h-1;y++){
+    for(let x=1;x<w-1;x++){
+      const o = (y*w+x)*4;
+      for(let k=0;k<3;k++){
+        const c = src[o+k];
+        const avg = (src[o-4+k] + src[o+4+k] + src[o-w*4+k] + src[o+w*4+k]) / 4;
+        d[o+k] = c + amount * (c - avg);
+      }
+    }
+  }
+}
+
+function applyFilter(imgData, mode){
+  if(mode === 'orig') return imgData;
+  const d = imgData.data, n = d.length;
+  if(mode === 'enhance'){
+    const c = 1.16, br = 6;
+    for(let i=0;i<n;i+=4){
+      d[i]   = (d[i]  -128)*c + 128 + br;
+      d[i+1] = (d[i+1]-128)*c + 128 + br;
+      d[i+2] = (d[i+2]-128)*c + 128 + br;
+    }
+    sharpenData(imgData, 0.55);
+  }else{
+    // 灰度
+    let sum = 0, count = 0;
+    for(let i=0;i<n;i+=4){
+      const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      d[i] = d[i+1] = d[i+2] = g;
+      sum += g; count++;
+    }
+    if(mode === 'bw'){
+      // 黑白二值化：按整体均值自适应阈值，还原纸面为纯白、文字为纯黑
+      const mean = sum / Math.max(count,1);
+      const th = Math.min(205, Math.max(120, mean * 0.88));
+      for(let i=0;i<n;i+=4) d[i] = d[i+1] = d[i+2] = d[i] > th ? 255 : 0;
+    }else{
+      const c = 1.12;
+      for(let i=0;i<n;i+=4){
+        const g = (d[i]-128)*c + 128 + 4;
+        d[i] = d[i+1] = d[i+2] = g;
+      }
+    }
+  }
+  return imgData;
+}
+
+function rotateCanvas90(src){
+  const c = document.createElement('canvas');
+  c.width = src.height; c.height = src.width;
+  const ctx = c.getContext('2d');
+  ctx.translate(c.width/2, c.height/2);
+  ctx.rotate(Math.PI/2);
+  ctx.drawImage(src, -src.width/2, -src.height/2);
+  return c;
+}
+
+/* ---- 扫描编辑器 ---- */
+function openScanEditor(file){
+  const old = $('#scan-modal'); if(old) old.remove();
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask'; mask.id = 'scan-modal';
+  mask.innerHTML = `
+    <div class="modal" style="max-width:680px">
+      <div class="between"><h2>拍照扫描</h2><button class="btn btn-sm" id="se-close">取消</button></div>
+      <div class="tiny" style="margin:8px 0 10px">拖动四个圆点对准纸面四角，保存时自动拉直矫正</div>
+      <div class="scan-stage" id="se-stage">
+        <canvas id="se-canvas"></canvas>
+        <svg class="scan-quad" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <polygon id="se-poly" fill="rgba(79,70,229,.14)" stroke="#4f46e5" stroke-width="2" vector-effect="non-scaling-stroke"></polygon>
+        </svg>
+        <div class="scan-handle" data-h="0"></div>
+        <div class="scan-handle" data-h="1"></div>
+        <div class="scan-handle" data-h="2"></div>
+        <div class="scan-handle" data-h="3"></div>
+      </div>
+      <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">
+        <div class="seg" id="se-filter" style="flex:1">
+          <button class="on" data-f="orig">原图</button>
+          <button data-f="enhance">增强清晰</button>
+          <button data-f="gray">灰度</button>
+          <button data-f="bw">黑白</button>
+        </div>
+        <button class="btn btn-sm" id="se-rotate">↻ 旋转</button>
+        <button class="btn btn-sm" id="se-reset">重置</button>
+      </div>
+      <div class="sel-row" style="margin-top:10px"><label>科目</label>
+        <select id="se-subject">
+          <option value="未分类">未分类</option>
+          ${SUBJECTS.map(s=>`<option value="${s}">${s}</option>`).join('')}
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="tiny" id="se-state" style="margin-top:8px">保存为高清 JPG（最长边 1800px），自动上传云端</div>
+      <button class="btn btn-primary btn-block" id="se-save" style="margin-top:10px">保存到题库</button>
+    </div>
+  `;
+  document.body.appendChild(mask);
+  mask.addEventListener('click', e=>{ if(e.target === mask) mask.remove(); });
+  $('#se-close', mask).addEventListener('click', ()=>mask.remove());
+
+  const stage = $('#se-stage', mask), canvas = $('#se-canvas', mask), poly = $('#se-poly', mask);
+  const handles = $$('.scan-handle', mask);
+  let imgCanvas = document.createElement('canvas');
+  let quad = [{x:.05,y:.05},{x:.95,y:.05},{x:.95,y:.95},{x:.05,y:.95}];
+  let mode = 'orig';
+
+  const cssFilter = ()=> mode === 'enhance' ? 'contrast(1.16) brightness(1.04) saturate(1.03)'
+    : mode === 'gray' ? 'grayscale(1) contrast(1.12)'
+    : mode === 'bw' ? 'grayscale(1) contrast(2.3) brightness(1.06)' : 'none';
+
+  function paintQuad(){
+    poly.setAttribute('points', quad.map(p=>`${(p.x*100).toFixed(2)},${(p.y*100).toFixed(2)}`).join(' '));
+    handles.forEach((h,i)=>{
+      h.style.left = (quad[i].x*100) + '%';
+      h.style.top = (quad[i].y*100) + '%';
+    });
+  }
+  function draw(){
+    const W = stage.clientWidth || 360;
+    const scale = W / imgCanvas.width;
+    const H = Math.round(imgCanvas.height * scale);
+    canvas.width = W; canvas.height = H;
+    canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.filter = cssFilter();
+    ctx.drawImage(imgCanvas, 0, 0, W, H);
+    ctx.filter = 'none';
+    paintQuad();
+  }
+
+  handles.forEach((h, i)=>{
+    h.addEventListener('pointerdown', ev=>{
+      ev.preventDefault();
+      h.setPointerCapture(ev.pointerId);
+      const move = e=>{
+        const r = stage.getBoundingClientRect();
+        quad[i] = {
+          x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+          y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+        };
+        paintQuad();
+      };
+      const up = ()=>{
+        h.removeEventListener('pointermove', move);
+        h.removeEventListener('pointerup', up);
+        h.removeEventListener('pointercancel', up);
+      };
+      h.addEventListener('pointermove', move);
+      h.addEventListener('pointerup', up);
+      h.addEventListener('pointercancel', up);
+    });
+  });
+
+  $$('#se-filter button', mask).forEach(b=>b.addEventListener('click', ()=>{
+    $$('#se-filter button', mask).forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); mode = b.dataset.f; draw();
+  }));
+  $('#se-reset', mask).addEventListener('click', ()=>{
+    quad = [{x:.05,y:.05},{x:.95,y:.05},{x:.95,y:.95},{x:.05,y:.95}]; paintQuad();
+  });
+  $('#se-rotate', mask).addEventListener('click', ()=>{
+    imgCanvas = rotateCanvas90(imgCanvas);
+    quad = [{x:.05,y:.05},{x:.95,y:.05},{x:.95,y:.95},{x:.05,y:.95}];
+    draw();
+  });
+
+  // 载入图片
+  const img = new Image();
+  img.onload = ()=>{
+    imgCanvas.width = img.naturalWidth; imgCanvas.height = img.naturalHeight;
+    imgCanvas.getContext('2d').drawImage(img, 0, 0);
+    draw();
+  };
+  img.onerror = ()=>{ $('#se-state', mask).textContent = '⚠️ 图片读取失败，请换一张试试'; };
+  img.src = URL.createObjectURL(file);
+
+  // 保存：透视矫正 → 滤镜增强 → 高清导出 → 上传
+  $('#se-save', mask).addEventListener('click', async ()=>{
+    if(!imgCanvas.width) return toast('图片还没加载完成');
+    const btn = $('#se-save', mask), state = $('#se-state', mask);
+    btn.disabled = true; btn.textContent = '正在处理…'; state.textContent = '正在矫正与增强，约需 2~5 秒…';
+    try{
+      const pts = quad.map(p=>({ x: p.x*imgCanvas.width, y: p.y*imgCanvas.height }));
+      const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+      let outW = Math.round(Math.max(dist(pts[0],pts[1]), dist(pts[3],pts[2])));
+      let outH = Math.round(Math.max(dist(pts[0],pts[3]), dist(pts[1],pts[2])));
+      const MAX = 1800;
+      if(Math.max(outW,outH) > MAX){ const r = MAX/Math.max(outW,outH); outW = Math.round(outW*r); outH = Math.round(outH*r); }
+      outW = Math.max(outW, 200); outH = Math.max(outH, 200);
+
+      let data = warpPerspective(imgCanvas, [pts[0],pts[1],pts[2],pts[3]], outW, outH);
+      data = applyFilter(data, mode);
+      const out = document.createElement('canvas');
+      out.width = outW; out.height = outH;
+      out.getContext('2d').putImageData(data, 0, 0);
+
+      const blob = await new Promise(res=>out.toBlob(res, 'image/jpeg', 0.92));
+      btn.textContent = '正在上传…';
+      const subject = $('#se-subject', mask).value;
+      const up = await uploadScanImage(blob, subject);
+      state.textContent = '✅ 已保存：' + up.url.slice(0, 60) + '…';
+      toast('已存入题库 ✅');
+      mask.remove();
+      if(currentRoute() === 'scan') renderScan();
+    }catch(e){
+      state.textContent = '⚠️ ' + friendlyError(e);
+      btn.disabled = false; btn.textContent = '保存到题库';
+    }
   });
 }
 
