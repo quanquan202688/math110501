@@ -135,8 +135,16 @@ select:focus,input:focus,textarea:focus{border-color:#b9bdf0;box-shadow:0 0 0 3p
 .modal-mask{position:fixed;inset:0;background:rgba(15,18,32,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:30px 14px;overflow:auto}
 .modal{background:#fff;border-radius:16px;max-width:520px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.28);margin-bottom:30px}
 .modal .tiny{display:block;margin:10px 0 5px;color:var(--ink2)}
+.ocr-preview{max-width:100%;max-height:220px;object-fit:contain;border-radius:10px;border:1px solid var(--line);display:block}
+.ocr-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}
+.ocr-bar>div{height:100%;background:var(--brand);width:0%;transition:width .3s}
+.wm-file-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-camera{position:relative;overflow:hidden}
+.btn-camera input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
 </style>
 </head>
+<!-- OCR 引擎（Tesseract.js，浏览器本地识别，支持中文） -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <body>
 <header class="header">
   <div class="header-inner">
@@ -668,7 +676,7 @@ async function renderWrong(){
   $('#btn-add-wrong')?.addEventListener('click', openWrongForm);
 }
 
-/* ---- 手动录入错题 ---- */
+/* ---- 手动录入错题（支持拍照 OCR 识别） ---- */
 function openWrongForm(){
   const old = $('#wrong-modal'); if(old) old.remove();
   const mask = document.createElement('div');
@@ -680,26 +688,45 @@ function openWrongForm(){
         <button class="btn btn-sm" id="wm-close">关闭</button>
       </div>
       <div class="stack" style="margin-top:4px">
+        <div class="card" style="background:var(--bg,#f6f7fb);padding:14px;margin:0">
+          <span class="tiny" style="margin-top:0"><b>📷 拍照识别</b>：拍下错题，自动识别文字并拆分题干/选项，照片会随错题一起保存（带图形的题目必拍）</span>
+          <div class="wm-file-row" style="margin-top:10px">
+            <button class="btn btn-sm btn-primary btn-camera" id="wm-capture">📷 拍照 / 选图
+              <input type="file" id="wm-file" accept="image/*" capture="environment" />
+            </button>
+            <button class="btn btn-sm btn-ok" id="wm-ocr" disabled>🔍 识别文字</button>
+          </div>
+          <div class="ocr-bar" id="wm-progress-wrap" style="display:none"><div id="wm-progress"></div></div>
+          <div class="tiny" id="wm-ocr-state" style="display:none;margin-top:6px"></div>
+          <img id="wm-preview" class="ocr-preview" style="display:none;margin-top:10px" alt="预览" />
+        </div>
         <div class="sel-row"><label>科目 *</label>
           <select id="wm-subject">
             ${SUBJECTS.map(s=>`<option value="${s}">${s}</option>`).join('')}
             <option value="其他">其他</option>
           </select>
         </div>
-        <div><span class="tiny">题干 *</span><textarea id="wm-question" rows="3" placeholder="粘贴或输入题目内容"></textarea></div>
-        <div><span class="tiny">选项（每行一个，没有选项可留空）</span><textarea id="wm-options" rows="4" placeholder="选项内容一&#10;选项内容二&#10;选项内容三&#10;选项内容四"></textarea></div>
-        <div class="row">
-          <div style="flex:1"><span class="tiny">正确答案 *</span><input type="text" id="wm-answer" placeholder="如 A" maxlength="4" /></div>
-          <div style="flex:1"><span class="tiny">你的答案</span><input type="text" id="wm-mine" placeholder="如 B（可留空）" maxlength="4" /></div>
+        <div class="sel-row"><label>题型</label>
+          <select id="wm-type">
+            <option value="choice">选择题（有选项）</option>
+            <option value="blank">填空题</option>
+            <option value="qa">问答题 / 申论</option>
+          </select>
         </div>
-        <div><span class="tiny">解析 / 错因笔记</span><textarea id="wm-analysis" rows="2" placeholder="为什么错、正确思路是什么"></textarea></div>
+        <div><span class="tiny">题干 *</span><textarea id="wm-question" rows="3" placeholder="拍照识别后自动填入，也可手动粘贴或输入"></textarea></div>
+        <div id="wm-options-wrap"><span class="tiny">选项（每行一个，识别后自动按 A/B/C/D 拆分）</span><textarea id="wm-options" rows="4" placeholder="A．选项内容一&#10;B．选项内容二&#10;C．选项内容三&#10;D．选项内容四"></textarea></div>
+        <div class="row">
+          <div style="flex:1"><span class="tiny" id="wm-answer-label">正确答案 *</span><input type="text" id="wm-answer" placeholder="如 A" /></div>
+          <div style="flex:1"><span class="tiny">你的答案</span><input type="text" id="wm-mine" placeholder="可留空" /></div>
+        </div>
+        <div><span class="tiny">解析 / 错因笔记</span><textarea id="wm-analysis" rows="2" placeholder="为什么错、正确思路是什么（识别结果里若有「解析」会自动填入）"></textarea></div>
         <div class="row">
           <div style="flex:1"><span class="tiny">难度</span>
             <select id="wm-tag"><option value="">不标记</option><option value="easy">简单</option><option value="mid">中等</option><option value="hard">困难</option></select>
           </div>
           <div style="flex:1"><span class="tiny">来源</span><input type="text" id="wm-source" placeholder="如：2024 国考真题" /></div>
         </div>
-        <div><span class="tiny">题目图片链接（可选）</span><input type="text" id="wm-image" placeholder="https://… 图片地址" /></div>
+        <div><span class="tiny">题目图片链接（可选，拍照后自动上传无需填写）</span><input type="text" id="wm-image" placeholder="https://… 图片地址" /></div>
         <button class="btn btn-primary btn-block" id="wm-save" style="margin-top:6px">保存到错题本</button>
       </div>
     </div>
@@ -707,34 +734,156 @@ function openWrongForm(){
   document.body.appendChild(mask);
   mask.addEventListener('click', e=>{ if(e.target === mask) mask.remove(); });
   $('#wm-close', mask).addEventListener('click', ()=>mask.remove());
+
+  /* ---- 题型切换：填空/问答隐藏选项、放宽答案 ---- */
+  const syncType = ()=>{
+    const t = $('#wm-type', mask).value;
+    $('#wm-options-wrap', mask).style.display = t==='choice' ? '' : 'none';
+    $('#wm-answer-label', mask).textContent = t==='choice' ? '正确答案 *' : '参考答案 *';
+    $('#wm-answer', mask).placeholder = t==='choice' ? '如 A' : '参考答案文字';
+    $('#wm-answer', mask).maxLength = t==='choice' ? 4 : 500;
+  };
+  $('#wm-type', mask).addEventListener('change', syncType);
+
+  /* ---- 拍照 / 选图 ---- */
+  let photoBlob = null;
+  $('#wm-file', mask).addEventListener('change', e=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    photoBlob = f;
+    const preview = $('#wm-preview', mask);
+    preview.src = URL.createObjectURL(f);
+    preview.style.display = 'block';
+    $('#wm-ocr', mask).disabled = false;
+    $('#wm-ocr-state', mask).style.display = 'none';
+  });
+
+  /* ---- 图片压缩：最长边 1280px，转 JPEG，控制体积 ---- */
+  async function compressImage(file){
+    const img = await new Promise((res, rej)=>{
+      const i = new Image();
+      i.onload = ()=>res(i); i.onerror = rej;
+      i.src = URL.createObjectURL(file);
+    });
+    const MAX = 1280;
+    let { width:w, height:h } = img;
+    if(Math.max(w,h) > MAX){ const r = MAX/Math.max(w,h); w = Math.round(w*r); h = Math.round(h*r); }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    return await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.82));
+  }
+
+  /* ---- OCR 识别 + 智能拆分 ---- */
+  function parseQuestionText(raw){
+    // 统一清理：去多余空格、行尾连字
+    const lines = raw.split(/\r?\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+    const optRe = /^\(?([A-Da-d])\s*[.、．:：)）]\s*(.+)$/;
+    let answer = '', analysis = '';
+    const optionMap = {}; const stemLines = []; let inAnalysis = false;
+    const ansRe = /^(?:正确答案|答案|参考答案)\s*[:：]?\s*([A-Da-d１-４1-4]|.+?)\s*$/;
+    const anaRe = /^(?:解析|答案解析|错因|说明)\s*[:：]?\s*(.*)$/;
+    for(let line of lines){
+      if(!inAnalysis){
+        const am = line.match(anaRe);
+        if(am){ inAnalysis = true; analysis = am[1]; continue; }
+      } else { analysis += ' ' + line; continue; }
+      const om = line.match(optRe);
+      if(om){ optionMap[om[1].toUpperCase()] = om[2].trim(); continue; }
+      const ansm = line.match(ansRe);
+      if(ansm){
+        const v = ansm[1];
+        if(/^[A-Da-d]$/.test(v)) answer = v.toUpperCase();
+        else if(/^[１-４]$/.test(v)) answer = String('１２３４'.indexOf(v)+1);
+        else answer = v;
+        continue;
+      }
+      stemLines.push(line);
+    }
+    const opts = ['A','B','C','D','E','F'].map(k=>optionMap[k]).filter(Boolean);
+    return { stem: stemLines.join('\n'), options: opts, answer, analysis };
+  }
+
+  $('#wm-ocr', mask).addEventListener('click', async ()=>{
+    if(!photoBlob || !window.Tesseract){ return toast(photoBlob ? 'OCR 引擎未加载完成，请稍候重试' : '请先拍照或选图'); }
+    const btn = $('#wm-ocr', mask), state = $('#wm-ocr-state', mask), wrap = $('#wm-progress-wrap', mask), bar = $('#wm-progress', mask);
+    btn.disabled = true; wrap.style.display = 'block'; state.style.display = 'block';
+    state.textContent = '正在识别（中文识别约需 10~30 秒，请稍候）…'; bar.style.width = '5%';
+    try{
+      const blob = await compressImage(photoBlob);
+      const ret = await Tesseract.recognize(blob, 'chi_sim', {
+        logger: m => { if(m.progress) bar.style.width = Math.round(m.progress*100)+'%'; }
+      });
+      const parsed = parseQuestionText(ret.data.text || '');
+      bar.style.width = '100%';
+      if(!parsed.stem && !parsed.options.length){ state.textContent = '⚠️ 没识别到有效文字，建议：光线充足、拍正、文字大一点再试一次（也可手动输入）'; return; }
+      $('#wm-question', mask).value = parsed.stem;
+      if(parsed.options.length >= 2){
+        $('#wm-type', mask).value = 'choice';
+        $('#wm-options', mask).value = parsed.options.map(o=>o).join('\n');
+      } else {
+        // 没拆出选项：默认按问答题处理，题干即全部文字
+        $('#wm-type', mask).value = 'qa';
+        $('#wm-question', mask).value = parsed.stem || ret.data.text.trim();
+      }
+      if(parsed.answer) $('#wm-answer', mask).value = parsed.answer;
+      if(parsed.analysis) $('#wm-analysis', mask).value = parsed.analysis;
+      syncType();
+      state.textContent = '✅ 识别完成，已自动填入。请核对下方内容（尤其答案），照片会随错题一起保存';
+    }catch(err){
+      state.textContent = '⚠️ 识别失败：' + String(err && err.message || err).slice(0,80) + '（可改为手动输入）';
+    }
+    btn.disabled = false;
+  });
+
+  /* ---- 保存：先传图片，再写库 ---- */
   $('#wm-save', mask).addEventListener('click', async ()=>{
     const question = $('#wm-question', mask).value.trim();
-    const answer = $('#wm-answer', mask).value.trim().toUpperCase();
+    const answer = $('#wm-answer', mask).value.trim();
     if(!question) return toast('题干不能为空');
-    if(!answer) return toast('请填写正确答案（如 A）');
-    const options = $('#wm-options', mask).value.split(/\r?\n/).map(s=>stripLetter(s.trim())).filter(Boolean);
-    const body = {
-      user_id: CFG.userId,
-      subject: $('#wm-subject', mask).value,
-      question_text: question,
-      options,
-      correct_answer: answer,
-      user_answer: $('#wm-mine', mask).value.trim().toUpperCase(),
-      analysis: $('#wm-analysis', mask).value.trim(),
-      source: $('#wm-source', mask).value.trim() || '手动录入',
-      review_count: 0,
-      mastery: 0,
-      tags: (()=>{ const t = $('#wm-tag', mask).value; return t ? [t] : []; })()
-    };
-    const img = $('#wm-image', mask).value.trim();
-    if(img) body.image_url = img;
+    if(!answer) return toast('请填写正确答案（选择题如 A）');
+    const type = $('#wm-type', mask).value;
+    const options = type==='choice'
+      ? $('#wm-options', mask).value.split(/\r?\n/).map(s=>stripLetter(s.trim())).filter(Boolean)
+      : [];
     const btn = $('#wm-save', mask); btn.disabled = true;
+    btn.textContent = photoBlob ? '正在上传图片…' : '正在保存…';
     try{
-      await insert('error_questions', body);
+      // 上传照片到 Supabase Storage
+      let imageUrl = $('#wm-image', mask).value.trim();
+      if(photoBlob && !imageUrl){
+        const blob = await compressImage(photoBlob);
+        const fname = `wrong-${Date.now()}.jpg`;
+        const up = await fetch(`${CFG.url}/storage/v1/object/wrong-images/${fname}`, {
+          method: 'POST',
+          headers: { 'apikey': CFG.key, 'Authorization': 'Bearer '+CFG.key, 'Content-Type': 'image/jpeg' },
+          body: blob
+        });
+        if(up.ok) imageUrl = `${CFG.url}/storage/v1/object/public/wrong-images/${fname}`;
+        else {
+          const em = await up.json().catch(()=>({}));
+          if(/Bucket not found|does not exist/i.test(em.message||'')) throw new Error('图片存储桶未创建：请先在 SQL Editor 执行 storage_setup.sql');
+          throw new Error('图片上传失败：' + (em.message || up.status));
+        }
+      }
+      await insert('error_questions', {
+        user_id: CFG.userId,
+        subject: $('#wm-subject', mask).value,
+        question_text: question,
+        options,
+        correct_answer: answer,
+        user_answer: $('#wm-mine', mask).value.trim(),
+        analysis: $('#wm-analysis', mask).value.trim(),
+        source: $('#wm-source', mask).value.trim() || '拍照录入',
+        review_count: 0,
+        mastery: 0,
+        tags: (()=>{ const t = $('#wm-tag', mask).value; return t ? [t] : []; })(),
+        image_url: imageUrl || null
+      });
       mask.remove();
       toast('已加入错题本 ✅');
       renderWrong();
-    }catch(e){ toast(friendlyError(e), 3200); btn.disabled = false; }
+    }catch(e){ toast(friendlyError(e), 4000); btn.disabled = false; btn.textContent = '保存到错题本'; }
   });
 }
 
