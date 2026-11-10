@@ -1,0 +1,26 @@
+name: Supabase Keepalive
+
+# 说明：Supabase 免费版项目 7 天不活跃会被自动暂停。
+# 这个任务每天自动向数据库发一次查询，让项目保持"活跃"状态。
+# 数据不会被删，这只是个定时"心跳"。
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 每天 UTC 01:00 = 北京时间 09:00 执行
+  workflow_dispatch:        # 允许在 Actions 页面手动点击运行
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcXN3emV1eHVhbXZoY2d1aGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2ODY0MzAsImV4cCI6MjEwNDI2MjQzMH0.loTb6Y-N0S5U6pnuQqbpligywsiz2bu0VuMSyvr9C6g" \
+            "https://toqswzeuxuamvhcguhec.supabase.co/rest/v1/questions?select=id&limit=1")
+          echo "Supabase 响应状态码: $CODE"
+          if [ "$CODE" = "200" ]; then
+            echo "✅ 数据库活跃，保活成功"
+          else
+            echo "::warning::Supabase 返回 $CODE，项目可能被暂停，请去控制台检查"
+          fi
