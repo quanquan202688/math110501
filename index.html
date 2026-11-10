@@ -149,6 +149,8 @@ select:focus,input:focus,textarea:focus{border-color:#b9bdf0;box-shadow:0 0 0 3p
 .scan-handle:active{cursor:grabbing;transform:scale(1.08)}
 .scan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:12px;margin-top:14px}
 .scan-item{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.scan-thumb-wrap{position:relative}
+.scan-check{position:absolute;top:7px;left:7px;width:24px;height:24px;accent-color:var(--brand);cursor:pointer;z-index:2;background:rgba(255,255,255,.85);border-radius:6px}
 .scan-thumb{width:100%;height:130px;object-fit:cover;background:#f1f2f8;display:block;cursor:zoom-in}
 .scan-meta{padding:8px 9px}
 .scan-meta .nm{font-size:11.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1020,11 +1022,13 @@ async function downloadAllScans(files){
 
 /* ---- 扫描题库页面 ---- */
 let scanFiles = [];
+let scanSelected = new Set();
 async function renderScan(){
   const view = $('#view');
   view.innerHTML = loading();
   const files = await listScans();
   scanFiles = files;
+  scanSelected = new Set();
   view.innerHTML = `
     <div class="card">
       <h1>扫描题库</h1>
@@ -1036,14 +1040,23 @@ async function renderScan(){
     <div class="card">
       <div class="between" style="flex-wrap:wrap;gap:8px">
         <div><h2 style="margin:0">我的扫描件</h2>
-          <div class="tiny" style="margin-top:3px">共 ${files.length} 张 · 全部存在云端，换手机也能看到</div></div>
-        <button class="btn btn-sm btn-primary" id="scan-dl-all" ${files.length?'':'disabled'}>⬇ 一键下载全部</button>
+          <div class="tiny" style="margin-top:3px">共 ${files.length} 张 · 勾选后可批量下载</div></div>
+        <div class="row" style="gap:8px;align-items:center">
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink2);cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="scan-all" style="width:17px;height:17px;accent-color:var(--brand)" /> 全选
+          </label>
+          <button class="btn btn-sm btn-primary" id="scan-dl-checked" disabled>⬇ 下载勾选(0)</button>
+          <button class="btn btn-sm" id="scan-dl-all" ${files.length?'':'disabled'}>⬇ 全部</button>
+        </div>
       </div>
       ${files.length ? `<div class="scan-grid">${files.map((f,i)=>{
         let nm = f.name.replace(/^scan-\d+-?/, '').replace(/\.jpg$/i, '').replace(/^wrong-\d+$/, '错题拍照');
         if(SCAN_CODE_SUB[nm]) nm = SCAN_CODE_SUB[nm];
         return `<div class="scan-item">
-          <img class="scan-thumb" src="${esc(f.url)}" data-view="${esc(f.url)}" alt="扫描件" loading="lazy" />
+          <div class="scan-thumb-wrap">
+            <img class="scan-thumb" src="${esc(f.url)}" data-view="${esc(f.url)}" alt="扫描件" loading="lazy" />
+            <input type="checkbox" class="scan-check" data-chk="${i}" title="勾选后批量下载" />
+          </div>
           <div class="scan-meta">
             <div class="nm" title="${esc(f.name)}">${esc(nm)}</div>
             <div class="tiny" style="margin-top:2px">${f.created?dateStr(new Date(f.created)):''}</div>
@@ -1081,6 +1094,32 @@ async function renderScan(){
     }catch(e){ toast('删除失败：' + friendlyError(e), 3000); }
   }));
   $('#scan-dl-all').addEventListener('click', ()=>downloadAllScans(scanFiles));
+
+  /* ---- 勾选批量下载 ---- */
+  const updateCheckedBtn = ()=>{
+    const btn = $('#scan-dl-checked', view);
+    if(!btn) return;
+    btn.textContent = `⬇ 下载勾选(${scanSelected.size})`;
+    btn.disabled = scanSelected.size === 0;
+  };
+  $$('[data-chk]', view).forEach(c=>c.addEventListener('change', ()=>{
+    const i = +c.dataset.chk;
+    if(c.checked) scanSelected.add(i); else scanSelected.delete(i);
+    updateCheckedBtn();
+  }));
+  const allBox = $('#scan-all', view);
+  if(allBox) allBox.addEventListener('change', ()=>{
+    const boxes = $$('[data-chk]', view);
+    boxes.forEach(b=>{ b.checked = allBox.checked; });
+    scanSelected = new Set(allBox.checked ? boxes.map(b=>+b.dataset.chk) : []);
+    updateCheckedBtn();
+  });
+  const checkedBtn = $('#scan-dl-checked', view);
+  if(checkedBtn) checkedBtn.addEventListener('click', ()=>{
+    if(!scanSelected.size) return toast('请先勾选要下载的图片');
+    const picked = [...scanSelected].sort((a,b)=>a-b).map(i=>scanFiles[i]);
+    downloadAllScans(picked);
+  });
 }
 
 /* ---- 四点透视矫正 + 清晰度增强 ---- */
