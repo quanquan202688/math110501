@@ -13,7 +13,8 @@
   --radius:16px; --shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 28px rgba(16,24,40,.06);
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw}
+.nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin-left:auto;min-width:0}
 body{
   background:var(--bg); color:var(--ink);
   font:15px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
@@ -131,6 +132,9 @@ select:focus,input:focus,textarea:focus{border-color:#b9bdf0;box-shadow:0 0 0 3p
 .spin{width:18px;height:18px;border:2px solid #dfe2ee;border-top-color:var(--brand);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
 .center{display:flex;align-items:center;justify-content:center;gap:8px;padding:40px 0;color:var(--ink3);font-size:13.5px}
+.modal-mask{position:fixed;inset:0;background:rgba(15,18,32,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:30px 14px;overflow:auto}
+.modal{background:#fff;border-radius:16px;max-width:520px;width:100%;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.28);margin-bottom:30px}
+.modal .tiny{display:block;margin:10px 0 5px;color:var(--ink2)}
 </style>
 </head>
 <body>
@@ -517,8 +521,10 @@ async function renderQuizResult(){
   `;
   bindGo(view);
 
+  const saveErrors = [];
+  const subject = quiz.subject || '综合';
+  // 1. 练习记录
   try{
-    const subject = quiz.subject || '综合';
     await insert('practice_records', {
       user_id: CFG.userId,
       subject,
@@ -529,36 +535,63 @@ async function renderQuizResult(){
       practiced_at: new Date().toISOString(),
       notes: `本次共答 ${answeredIdx.length} 题，答对 ${right} 题，答错 ${wrong} 题，用时 ${minutes} 分钟`
     });
-    await insert('study_logs', {
-      user_id: CFG.userId,
-      study_date: todayStr(),
-      total_minutes: minutes,
-      correct_count: right,
-      error_count: wrong,
-      notes: '网页刷题'
-    });
-    const wrongCards = quiz.list.filter((q,i)=> quiz.results[i] === false);
-    if(wrongCards.length){
-      await insert('error_questions', wrongCards.map(q=>{
-        const opts = parseOptions(q.options);
-        return {
-          user_id: CFG.userId,
-          subject: q.subject || '未分类',
-          question_text: q.question || '',
-          options: opts,
-          correct_answer: q.answer || '',
-          user_answer: (()=>{ const i = quiz.answers[quiz.list.indexOf(q)]; return i>=0 ? LETTERS[i] : ''; })(),
-          analysis: q.analysis || '',
-          source: q.source || '网页刷题',
-          review_count: 0,
-          mastery: 0,
-          tags: q.difficulty ? [q.difficulty] : []
-        };
-      }));
+  }catch(e){ saveErrors.push('练习记录：' + friendlyError(e)); }
+
+  // 2. 学习日志（同一子只有一条记录，重复则累加）
+  try{
+    const existing = await sb('study_logs', `?select=*&user_id=eq.${CFG.userId}&study_date=eq.${todayStr()}&limit=1`);
+    if(existing && existing.length){
+      const e0 = existing[0];
+      await patch('study_logs', `?id=eq.${e0.id}`, {
+        total_minutes: (e0.total_minutes||0) + minutes,
+        correct_count: (e0.correct_count||0) + right,
+        error_count: (e0.error_count||0) + wrong,
+        updated_at: new Date().toISOString()
+      });
+    }else{
+      await insert('study_logs', {
+        user_id: CFG.userId,
+        study_date: todayStr(),
+        total_minutes: minutes,
+        correct_count: right,
+        error_count: wrong,
+        notes: '网页刷题'
+      });
     }
-    $('#save-state').textContent = '✅ 记录已保存，错题已加入错题本';
-  }catch(e){
-    $('#save-state').textContent = '⚠️ ' + friendlyError(e);
+  }catch(e){ saveErrors.push('学习日志：' + friendlyError(e)); }
+
+  // 3. 错题逐条入库（一条失败不影响其他）
+  const wrongCards = quiz.list.filter((q,i)=> quiz.results[i] === false);
+  let savedWrong = 0, failedWrong = 0;
+  for(const q of wrongCards){
+    try{
+      const opts = parseOptions(q.options);
+      const myIdx = quiz.answers[quiz.list.indexOf(q)];
+      await insert('error_questions', {
+        user_id: CFG.userId,
+        subject: q.subject || '未分类',
+        question_text: q.question || '',
+        options: opts,
+        correct_answer: q.answer || '',
+        user_answer: myIdx >= 0 ? LETTERS[myIdx] : '',
+        analysis: q.analysis || '',
+        source: q.source || '网页刷题',
+        review_count: 0,
+        mastery: 0,
+        tags: q.difficulty ? [q.difficulty] : []
+      });
+      savedWrong++;
+    }catch(e){ failedWrong++; console.warn('错题入库失败:', e); }
+  }
+
+  // 4. 汇总提示
+  const stateEl = $('#save-state');
+  if(stateEl){
+    if(!saveErrors.length && !failedWrong){
+      stateEl.textContent = `✅ 记录已保存${savedWrong?`，${savedWrong} 道错题已加入错题本`:''}`;
+    }else{
+      stateEl.innerHTML = '⚠️ ' + esc(saveErrors.join('；')) + (failedWrong?`；错题 ${failedWrong} 条入库失败`:'');
+    }
   }
   quiz.list = []; quiz.results = []; quiz.answers = [];
 }
@@ -575,9 +608,12 @@ async function renderWrong(){
 
   view.innerHTML = `
     <div class="card">
-      <div class="between">
+      <div class="between" style="flex-wrap:wrap">
         <div><h1>错题本</h1><div class="tiny" style="margin-top:3px">共 ${rows.length} 道错题，按错因逐个攻克</div></div>
-        <span class="chip err">${rows.length}</span>
+        <div class="row" style="gap:8px">
+          <span class="chip err">${rows.length}</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-wrong">＋ 录入错题</button>
+        </div>
       </div>
       ${subs.length?`<div class="seg" style="margin-top:14px">
         <button class="${wrongSubject?'':'on'}" data-sub="">全部</button>
@@ -598,6 +634,7 @@ async function renderWrong(){
           <span class="tiny">${r.created_at?dateStr(new Date(r.created_at)):''}</span>
         </div>
         <div class="q-title" style="font-size:15px">${esc(r.question_text||'')}</div>
+        ${r.image_url?`<img src="${esc(r.image_url)}" alt="题目图片" style="max-width:100%;max-height:260px;object-fit:contain;border-radius:10px;margin-top:10px;border:1px solid var(--line)" loading="lazy">`:''}
         <div class="stack" style="margin-top:12px">
           ${opts.map((o,i)=>`<div class="opt ${i===rightIdx?'correct':''}" style="cursor:default">
             <span class="ltr">${LETTERS[i]||i+1}</span><span>${esc(stripLetter(o))}</span></div>`).join('')}
@@ -628,6 +665,77 @@ async function renderWrong(){
     try{ await del('error_questions', `?id=eq.${b.dataset.master}`); toast('已移出错题本 ✅'); renderWrong(); }
     catch(e){ toast(friendlyError(e), 3000); }
   }));
+  $('#btn-add-wrong')?.addEventListener('click', openWrongForm);
+}
+
+/* ---- 手动录入错题 ---- */
+function openWrongForm(){
+  const old = $('#wrong-modal'); if(old) old.remove();
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask'; mask.id = 'wrong-modal';
+  mask.innerHTML = `
+    <div class="modal">
+      <div class="between">
+        <h2>录入错题</h2>
+        <button class="btn btn-sm" id="wm-close">关闭</button>
+      </div>
+      <div class="stack" style="margin-top:4px">
+        <div class="sel-row"><label>科目 *</label>
+          <select id="wm-subject">
+            ${SUBJECTS.map(s=>`<option value="${s}">${s}</option>`).join('')}
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div><span class="tiny">题干 *</span><textarea id="wm-question" rows="3" placeholder="粘贴或输入题目内容"></textarea></div>
+        <div><span class="tiny">选项（每行一个，没有选项可留空）</span><textarea id="wm-options" rows="4" placeholder="选项内容一&#10;选项内容二&#10;选项内容三&#10;选项内容四"></textarea></div>
+        <div class="row">
+          <div style="flex:1"><span class="tiny">正确答案 *</span><input type="text" id="wm-answer" placeholder="如 A" maxlength="4" /></div>
+          <div style="flex:1"><span class="tiny">你的答案</span><input type="text" id="wm-mine" placeholder="如 B（可留空）" maxlength="4" /></div>
+        </div>
+        <div><span class="tiny">解析 / 错因笔记</span><textarea id="wm-analysis" rows="2" placeholder="为什么错、正确思路是什么"></textarea></div>
+        <div class="row">
+          <div style="flex:1"><span class="tiny">难度</span>
+            <select id="wm-tag"><option value="">不标记</option><option value="easy">简单</option><option value="mid">中等</option><option value="hard">困难</option></select>
+          </div>
+          <div style="flex:1"><span class="tiny">来源</span><input type="text" id="wm-source" placeholder="如：2024 国考真题" /></div>
+        </div>
+        <div><span class="tiny">题目图片链接（可选）</span><input type="text" id="wm-image" placeholder="https://… 图片地址" /></div>
+        <button class="btn btn-primary btn-block" id="wm-save" style="margin-top:6px">保存到错题本</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(mask);
+  mask.addEventListener('click', e=>{ if(e.target === mask) mask.remove(); });
+  $('#wm-close', mask).addEventListener('click', ()=>mask.remove());
+  $('#wm-save', mask).addEventListener('click', async ()=>{
+    const question = $('#wm-question', mask).value.trim();
+    const answer = $('#wm-answer', mask).value.trim().toUpperCase();
+    if(!question) return toast('题干不能为空');
+    if(!answer) return toast('请填写正确答案（如 A）');
+    const options = $('#wm-options', mask).value.split(/\r?\n/).map(s=>stripLetter(s.trim())).filter(Boolean);
+    const body = {
+      user_id: CFG.userId,
+      subject: $('#wm-subject', mask).value,
+      question_text: question,
+      options,
+      correct_answer: answer,
+      user_answer: $('#wm-mine', mask).value.trim().toUpperCase(),
+      analysis: $('#wm-analysis', mask).value.trim(),
+      source: $('#wm-source', mask).value.trim() || '手动录入',
+      review_count: 0,
+      mastery: 0,
+      tags: (()=>{ const t = $('#wm-tag', mask).value; return t ? [t] : []; })()
+    };
+    const img = $('#wm-image', mask).value.trim();
+    if(img) body.image_url = img;
+    const btn = $('#wm-save', mask); btn.disabled = true;
+    try{
+      await insert('error_questions', body);
+      mask.remove();
+      toast('已加入错题本 ✅');
+      renderWrong();
+    }catch(e){ toast(friendlyError(e), 3200); btn.disabled = false; }
+  });
 }
 
 /* ============ 记录 ============ */
